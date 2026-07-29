@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc728264d94ffb946a611ea6807ec083, type: 3}
+  m_Name: BakedClipsAsset
+  m_EditorClassIdentifier: 
+  AnimationsTexX: {fileID: 2800000, guid: 1b527e97c8a605f4f9d4142de9040439, type: 2}
+  AnimationsTexY: {fileID: 2800000, guid: 61780b3ef3fcd1d488bae46120fbf2ff, type: 2}
+  AnimationsTexZ: {fileID: 2800000, guid: f13050ac6c8015046a7c79c12957a760, type: 2}
+  totalFrames: 120
+  clips:
+  - clipName: moving
+    startFrame: 0
+    frameRate: 24
+    frameCount: 60
+  - clipName: rolling
+    startFrame: 60
+    frameRate: 24
+    frameCount: 60
