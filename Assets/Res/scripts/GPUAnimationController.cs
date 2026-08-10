@@ -7,7 +7,7 @@ public class GPUAnimationController : MonoBehaviour
     public BakedClipsAsset bakedClipsAsset;
     private double playAStartTime;
     private int currentClipStartFrame;
-    private Renderer renderer;
+    private Renderer[] renderers;
     public bool isplaying = false;
     private BakedClipsAsset.clipInfo currentClipInfo;
     private MaterialPropertyBlock propertyBlock;
@@ -15,8 +15,8 @@ public class GPUAnimationController : MonoBehaviour
     // Start is called before the first frame update
     void OnEnable()
     {
-        renderer = GetComponent<Renderer>();
-        if (renderer == null)
+        renderers = GetComponentsInChildren<Renderer>();
+        if (GetComponent<Renderer>() == null)
         {
             Debug.LogError("Renderer component not found on the GameObject.");
             return;
@@ -57,23 +57,24 @@ public class GPUAnimationController : MonoBehaviour
                 return false;
             }
         }
-        if (renderer == null)
+
+        if (renderers == null)
         {
             Debug.LogError("Renderer component not found on the GameObject.");
             return false;
         }
         
-        var meshFilter = this.GetComponent<MeshFilter>();
-        if(meshFilter == null || meshFilter.sharedMesh == null)
+        var meshFilter = this.GetComponentsInChildren<MeshFilter>();
+        if(meshFilter == null)
         {
             Debug.LogError("MeshFilter component not found on the GameObject.");
             return false;
         }
-        if (renderer.sharedMaterial == null)
-        {
-            Debug.LogError("Material is not assigned to the Renderer.");
-            return false;
-        }
+        // if (renderer.sharedMaterial == null)
+        // {
+        //     Debug.LogError("Material is not assigned to the Renderer.");
+        //     return false;
+        // }
         return true;
     }
 
@@ -83,16 +84,20 @@ public class GPUAnimationController : MonoBehaviour
             return;
 
         // Set the textures to the material
-        renderer.GetPropertyBlock(propertyBlock);
-        propertyBlock.SetTexture("_MainTex1", bakedClipsAsset.AnimationsTexX);
-        propertyBlock.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
-        propertyBlock.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
-
+        // foreach(Renderer R in renderers)
+        // {
+        //     renderer.GetPropertyBlock(propertyBlock);
+        //     propertyBlock.SetTexture("_MainTex1", bakedClipsAsset.AnimationsTexX);
+        //     propertyBlock.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
+        //     propertyBlock.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
+        //     renderer.SetPropertyBlock(propertyBlock);
+        // }
+        var m = renderers[0].sharedMaterial;
+        m.SetTexture("_MainTex1", bakedClipsAsset.AnimationsTexX);
+        m.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
+        m.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
+        // m.SetFloat("_CobjsOffset", 0.5f/bakedClipsAsset.AmountOfObjects);
         // Apply the property block to the renderer
-        if (renderer != null)
-        {
-            renderer.SetPropertyBlock(propertyBlock);
-        }
         currentClipInfo = bakedClipsAsset.clips[clipIndex];
         playAStartTime = Time.time;
         isplaying = true;
@@ -122,11 +127,11 @@ public class GPUAnimationController : MonoBehaviour
 
     void UpdateShaderFrame(float frameIndex)
     {
-        if(renderer == null)
+        if(renderers == null)
             return;
 
-        renderer.GetPropertyBlock(propertyBlock);
-        propertyBlock.SetFloat("_frameState", frameIndex);
-        renderer.SetPropertyBlock(propertyBlock);
+        var m = renderers[0].sharedMaterial;
+        m.SetFloat("_frameState", frameIndex);
+        // renderer.SetPropertyBlock(propertyBlock);
     }
 }

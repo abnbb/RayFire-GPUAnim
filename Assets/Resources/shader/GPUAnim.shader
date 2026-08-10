@@ -28,6 +28,7 @@ Shader "Custom/GPUAnim"
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+                float3 color :COLOR;
             };
 
             struct v2f
@@ -44,17 +45,19 @@ Shader "Custom/GPUAnim"
             float4 _MainTex2_ST;
             float4 _MainTex3_ST;
             float _frameState;
+            // float _CobjsOffset;
 
             v2f vert (appdata v)
             {
                 v2f o;
-                float2 timestep = float2(_frameState, 0.5);
+                float index = v.color.r;
+                float2 timestep = float2(_frameState, index);
                 float4 r1 = tex2Dlod(_MainTex1, float4(timestep, 0, 0));
                 float4 r2 = tex2Dlod(_MainTex2, float4(timestep, 0, 0));
                 float4 r3 = tex2Dlod(_MainTex3, float4(timestep, 0, 0));
                 float3x4 M = float3x4(r1, r2, r3);
                 float3 worldPos = mul(M, v.vertex);
-                o.vertex = UnityObjectToClipPos(float4(worldPos, 1.0));
+                o.vertex = UnityWorldToClipPos(float4(worldPos, 1.0));
                 o.uv = v.uv;
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;

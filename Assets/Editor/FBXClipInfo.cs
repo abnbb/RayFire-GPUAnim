@@ -5,11 +5,12 @@ using UnityEngine;
 
 public static class FBXClipInfo
 {
-    private const int AnimatedObjectCount = 1;
+    // private int AnimatedObjectCount = 0;
     private const string MenuPath = "Assets/烘焙物体动画";
     private const string TextureFolder = "Assets/Resources/Tex";
     private const string PrefabFolder = "Assets/Res/prefab";
     private const string MaterialFolder = "Assets/Res/materials";
+    private const string MeshFolder = "Assets/Resources/meshes";
     private const string ShaderName = "Custom/GPUAnim";
 
     private struct ClipInfo
@@ -54,19 +55,27 @@ public static class FBXClipInfo
         }
 
         EnsureProjectFolders();
+        int AnimatedObjectCount = CountRenderableObjec(sourceObject);
+        if (AnimatedObjectCount <= 0)
+        {
+            Debug.LogWarning("No renderable MeshFilter objects were found in the selected asset.");
+            return;
+        }
+
 
         Texture2D gpuTexX;
         Texture2D gpuTexY;
         Texture2D gpuTexZ;
-        BakeClipMatrices(sourceObject, clipInfos, totalFrameCount, out gpuTexX, out gpuTexY, out gpuTexZ);
+        BakeClipMatrices(sourceObject, clipInfos, totalFrameCount, AnimatedObjectCount, out gpuTexX, out gpuTexY, out gpuTexZ);
 
         string assetName = sourceObject.name;
         SaveTextureAsset(gpuTexX, TextureFolder + "/" + assetName + "_GPUTexX.asset");
         SaveTextureAsset(gpuTexY, TextureFolder + "/" + assetName + "_GPUTexY.asset");
         SaveTextureAsset(gpuTexZ, TextureFolder + "/" + assetName + "_GPUTexZ.asset");
 
-        BakedClipsAsset bakedClipsAsset = CreateBakedClipsAsset(clipInfos, totalFrameCount, gpuTexX, gpuTexY, gpuTexZ);
+        BakedClipsAsset bakedClipsAsset = CreateBakedClipsAsset(clipInfos, totalFrameCount,AnimatedObjectCount ,gpuTexX, gpuTexY, gpuTexZ);
         SaveBakedClipsAsset(bakedClipsAsset, TextureFolder + "/" + assetName + "_BakedClipsAsset.asset");
+
         GenerateGPUAnimationPrefab(sourceObject, bakedClipsAsset, PrefabFolder + "/" + assetName + ".prefab");
 
         AssetDatabase.SaveAssets();
@@ -85,6 +94,57 @@ public static class FBXClipInfo
 
         string assetPath = AssetDatabase.GetAssetPath(selectedAsset);
         return !string.IsNullOrEmpty(assetPath);
+    }
+
+    private static void SaveObjectIndex(GameObject instance, string assetName)
+    {
+        List<Transform> renderableObjects = CollectRenderableObjects(instance);
+        int animatedObjectCount = renderableObjects.Count;
+        if (animatedObjectCount == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < animatedObjectCount; i++)
+        {
+            Transform childTransform = renderableObjects[i];
+            MeshFilter meshFilter = childTransform.GetComponent<MeshFilter>();
+            Mesh mesh = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
+            mesh.name = assetName + "_" + childTransform.name + "_GPUAnimMesh_" + i;
+
+            int vertexCount = mesh.vertexCount;
+            Color[] indexColors = new Color[vertexCount];
+            Color indexColor = new Color((i + 0.5f) / animatedObjectCount, 0f, 0f, 1f);
+            for (int j = 0; j < vertexCount; j++)
+            {
+                indexColors[j] = indexColor;
+            }
+
+            mesh.colors = indexColors;
+            meshFilter.sharedMesh = mesh;
+            SaveMeshAsset(mesh, MeshFolder + "/" + mesh.name + ".asset");
+        }
+    }
+
+    private static int CountRenderableObjec(GameObject sourceObject)
+    {
+        return CollectRenderableObjects(sourceObject).Count;
+    }
+
+    private static List<Transform> CollectRenderableObjects(GameObject sourceObject)
+    {
+        List<Transform> renderableObjects = new List<Transform>();
+        foreach (Transform child in sourceObject.GetComponentsInChildren<Transform>(true))
+        {
+            Renderer renderer = child.GetComponent<Renderer>();
+            MeshFilter meshFilter = child.GetComponent<MeshFilter>();
+            if (renderer != null && meshFilter != null && meshFilter.sharedMesh != null)
+            {
+                renderableObjects.Add(child);
+            }
+        }
+
+        return renderableObjects;
     }
 
     private static List<ClipInfo> LoadClipInfos(string assetPath)
@@ -118,48 +178,57 @@ public static class FBXClipInfo
         GameObject sourceObject,
         List<ClipInfo> clipInfos,
         int totalFrameCount,
+        int AnimatedObjectCount,
         out Texture2D gpuTexX,
         out Texture2D gpuTexY,
         out Texture2D gpuTexZ)
     {
-        gpuTexX = CreateDataTexture(totalFrameCount);
-        gpuTexY = CreateDataTexture(totalFrameCount);
-        gpuTexZ = CreateDataTexture(totalFrameCount);
+        gpuTexX = CreateDataTexture(totalFrameCount, AnimatedObjectCount);
+        gpuTexY = CreateDataTexture(totalFrameCount, AnimatedObjectCount);
+        gpuTexZ = CreateDataTexture(totalFrameCount, AnimatedObjectCount);
 
-        Color[] texX = new Color[totalFrameCount];
-        Color[] texY = new Color[totalFrameCount];
-        Color[] texZ = new Color[totalFrameCount];
+        Color[] texX = new Color[AnimatedObjectCount*totalFrameCount];
+        Color[] texY = new Color[texX.Length];
+        Color[] texZ = new Color[texX.Length];
 
         GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
-        int frameIndex = 0;
+        
+        List<Transform> ObjTrans = CollectRenderableObjects(instance);
 
-        foreach (ClipInfo clipInfo in clipInfos)
+
+        for (int i = 0; i < ObjTrans.Count; i++)
         {
-            if (clipInfo.clip == null || clipInfo.frameRate <= 0f)
+            int frameIndex = 0;
+            foreach (ClipInfo clipInfo in clipInfos)
             {
-                continue;
-            }
-
-            float frameDeltaTime = 1f / clipInfo.frameRate;
-            int writtenFrameCount = 0;
-
-            for (float time = 0f; time < clipInfo.clip.length && writtenFrameCount < clipInfo.frameCount; time += frameDeltaTime)
-            {
-                if (frameIndex >= totalFrameCount)
+                if (clipInfo.clip == null || clipInfo.frameRate <= 0f)
                 {
-                    break;
+                    continue;
                 }
 
-                clipInfo.clip.SampleAnimation(instance, time);
-                Matrix4x4 matrix = instance.transform.localToWorldMatrix;
-                texX[frameIndex] = matrix.GetRow(0);
-                texY[frameIndex] = matrix.GetRow(1);
-                texZ[frameIndex] = matrix.GetRow(2);
+                float frameDeltaTime = 1f / clipInfo.frameRate;
+                int writtenFrameCount = 0;
 
-                frameIndex++;
-                writtenFrameCount++;
+                for (float time = 0f; time < clipInfo.clip.length && writtenFrameCount < clipInfo.frameCount; time += frameDeltaTime)
+                {
+                    if (frameIndex >= totalFrameCount)
+                    {
+                        break;
+                    }
+
+                    clipInfo.clip.SampleAnimation(instance, time);
+                    Matrix4x4 matrix = ObjTrans[i].localToWorldMatrix;
+                    var index = i * totalFrameCount + frameIndex;
+                    texX[index] = matrix.GetRow(0);
+                    texY[index] = matrix.GetRow(1);
+                    texZ[index] = matrix.GetRow(2);
+
+                    frameIndex++;
+                    writtenFrameCount++;
+                }
             }
         }
+        
 
         UnityEngine.Object.DestroyImmediate(instance);
 
@@ -174,6 +243,7 @@ public static class FBXClipInfo
     private static BakedClipsAsset CreateBakedClipsAsset(
         List<ClipInfo> clipInfos,
         int totalFrameCount,
+        int amountOfObjects,
         Texture2D gpuTexX,
         Texture2D gpuTexY,
         Texture2D gpuTexZ)
@@ -183,6 +253,7 @@ public static class FBXClipInfo
         bakedClipsAsset.AnimationsTexY = gpuTexY;
         bakedClipsAsset.AnimationsTexZ = gpuTexZ;
         bakedClipsAsset.totalFrames = totalFrameCount;
+        bakedClipsAsset.AmountOfObjects = amountOfObjects;
 
         foreach (ClipInfo clipInfo in clipInfos)
         {
@@ -201,25 +272,29 @@ public static class FBXClipInfo
     private static void GenerateGPUAnimationPrefab(GameObject sourceObject, BakedClipsAsset bakedClipsAsset, string prefabPath)
     {
         GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
-        Renderer targetRenderer = FindPlayableRenderer(instance);
-        if (targetRenderer == null)
-        {
-            UnityEngine.Object.DestroyImmediate(instance);
-            Debug.LogWarning("No Renderer with MeshFilter was found in the generated instance.");
-            return;
-        }
+        SaveObjectIndex(instance, sourceObject.name);
 
-        GPUAnimationController controller = targetRenderer.GetComponent<GPUAnimationController>();
+        GPUAnimationController controller = instance.GetComponent<GPUAnimationController>();
         if (controller == null)
         {
-            controller = targetRenderer.gameObject.AddComponent<GPUAnimationController>();
+            controller = instance.AddComponent<GPUAnimationController>();
         }
 
         controller.bakedClipsAsset = bakedClipsAsset;
-        AssignGPUAnimationMaterial(targetRenderer, sourceObject.name);
 
-        string uniquePath = AssetDatabase.GenerateUniqueAssetPath(prefabPath);
-        PrefabUtility.SaveAsPrefabAsset(instance, uniquePath);
+        foreach(Transform child in CollectRenderableObjects(instance))
+        {
+            Renderer targetRenderer = child.GetComponent<Renderer>();
+            if (targetRenderer == null)
+            {
+                continue;
+            }
+
+            
+            AssignGPUAnimationMaterial(targetRenderer, sourceObject.name);
+        }
+        DeleteAssetIfExists(prefabPath);
+        PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
         UnityEngine.Object.DestroyImmediate(instance);
     }
 
@@ -231,10 +306,18 @@ public static class FBXClipInfo
             Debug.LogWarning("Shader was not found: " + ShaderName);
             return;
         }
+        string materialName = assetName + "_GPUAnim";
+        string materialPath = MaterialFolder + "/" + materialName + ".mat";
+        Material existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+        if (existingMaterial != null)
+        {
+            targetRenderer.sharedMaterial = existingMaterial;
+            return;
+        }
 
         Material material = new Material(shader);
-        material.name = assetName + "_GPUAnim";
-        string materialPath = AssetDatabase.GenerateUniqueAssetPath(MaterialFolder + "/" + material.name + ".mat");
+        material.name = materialName;
+        DeleteAssetIfExists(materialPath);
         AssetDatabase.CreateAsset(material, materialPath);
         targetRenderer.sharedMaterial = material;
     }
@@ -254,7 +337,7 @@ public static class FBXClipInfo
         return instance.GetComponent<Renderer>();
     }
 
-    private static Texture2D CreateDataTexture(int totalFrameCount)
+    private static Texture2D CreateDataTexture(int totalFrameCount,int AnimatedObjectCount)
     {
         Texture2D texture = new Texture2D(totalFrameCount, AnimatedObjectCount, TextureFormat.RGBAHalf, false, true);
         texture.filterMode = FilterMode.Point;
@@ -264,14 +347,28 @@ public static class FBXClipInfo
 
     private static void SaveTextureAsset(Texture2D texture, string path)
     {
-        string uniquePath = AssetDatabase.GenerateUniqueAssetPath(path);
-        AssetDatabase.CreateAsset(texture, uniquePath);
+        DeleteAssetIfExists(path);
+        AssetDatabase.CreateAsset(texture, path);
     }
 
     private static void SaveBakedClipsAsset(BakedClipsAsset bakedClipsAsset, string path)
     {
-        string uniquePath = AssetDatabase.GenerateUniqueAssetPath(path);
-        AssetDatabase.CreateAsset(bakedClipsAsset, uniquePath);
+        DeleteAssetIfExists(path);
+        AssetDatabase.CreateAsset(bakedClipsAsset, path);
+    }
+
+    private static void SaveMeshAsset(Mesh mesh, string path)
+    {
+        DeleteAssetIfExists(path);
+        AssetDatabase.CreateAsset(mesh, path);
+    }
+
+    private static void DeleteAssetIfExists(string path)
+    {
+        if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null)
+        {
+            AssetDatabase.DeleteAsset(path);
+        }
     }
 
     private static int GetTotalFrameCount(List<ClipInfo> clipInfos)
@@ -308,6 +405,7 @@ public static class FBXClipInfo
         EnsureFolder("Assets", "Res");
         EnsureFolder("Assets/Res", "prefab");
         EnsureFolder("Assets/Res", "materials");
+        EnsureFolder("Assets/Res", "meshes");
     }
 
     private static void EnsureFolder(string parentFolder, string folderName)

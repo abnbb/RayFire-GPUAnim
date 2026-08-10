@@ -17,6 +17,7 @@ public class BakedClipsAsset : ScriptableObject
    public Texture2D AnimationsTexY;
    public Texture2D AnimationsTexZ;
    public int totalFrames;
+   public int AmountOfObjects;
 
    public List<clipInfo> clips = new List<clipInfo>();
     
