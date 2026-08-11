@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using UnityEditor;
 using UnityEngine;
 
@@ -20,6 +21,11 @@ public static class FBXClipInfo
         public int frameCount;
         public float frameRate;
         public AnimationClip clip;
+    }
+
+    private struct ObjInfo
+    {
+        public Matrix4x4 BindPose;
     }
 
     [MenuItem(MenuPath)]
@@ -146,6 +152,24 @@ public static class FBXClipInfo
 
         return renderableObjects;
     }
+    private static List<ObjInfo> loadObjInfos(List<Transform> ObjTrans)
+    {
+        List<ObjInfo> objInfos = new List<ObjInfo>();
+        foreach(var obj in ObjTrans)
+        {
+            ObjInfo oi = new ObjInfo();
+            oi.BindPose = obj.worldToLocalMatrix;
+            objInfos.Add(oi);
+        }
+        return objInfos;
+    }
+
+    // private static ObjInfo loadObjInfo(GameObject instance)
+    // {
+    //     var o = new ObjInfo();
+    //     o.BindPose = instance.GetComponent<Transform>().worldToLocalMatrix;
+    //     return ;
+    // }
 
     private static List<ClipInfo> LoadClipInfos(string assetPath)
     {
@@ -174,6 +198,7 @@ public static class FBXClipInfo
         return clipInfos;
     }
 
+
     private static void BakeClipMatrices(
         GameObject sourceObject,
         List<ClipInfo> clipInfos,
@@ -194,6 +219,7 @@ public static class FBXClipInfo
         GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
         
         List<Transform> ObjTrans = CollectRenderableObjects(instance);
+        List<ObjInfo> objInfos = loadObjInfos(ObjTrans);
 
 
         for (int i = 0; i < ObjTrans.Count; i++)

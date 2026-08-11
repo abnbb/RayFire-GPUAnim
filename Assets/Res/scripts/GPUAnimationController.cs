@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+// using System.ComponentModel.DataAnnotations;
 using UnityEngine;
 
 public class GPUAnimationController : MonoBehaviour
@@ -9,6 +10,8 @@ public class GPUAnimationController : MonoBehaviour
     private int currentClipStartFrame;
     private Renderer[] renderers;
     public bool isplaying = false;
+    public bool playByHand = false;
+    [Range(0,1) ]public float frameplay = 0;
     private BakedClipsAsset.clipInfo currentClipInfo;
     private MaterialPropertyBlock propertyBlock;
 
@@ -16,7 +19,7 @@ public class GPUAnimationController : MonoBehaviour
     void OnEnable()
     {
         renderers = GetComponentsInChildren<Renderer>();
-        if (GetComponent<Renderer>() == null)
+        if (renderers == null)
         {
             Debug.LogError("Renderer component not found on the GameObject.");
             return;
@@ -110,8 +113,15 @@ public class GPUAnimationController : MonoBehaviour
 
     void Update()
     {
+        if (playByHand)
+        {
+            UpdateShaderFrame(frameplay);
+            return;
+        }
+        
         if(!isplaying)
             return;
+        
 
         double elapsedTime = Time.time - playAStartTime;
         int currentFrame = (int)(elapsedTime * currentClipInfo.frameRate)+currentClipInfo.startFrame;
