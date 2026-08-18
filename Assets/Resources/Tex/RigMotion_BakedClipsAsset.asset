@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc728264d94ffb946a611ea6807ec083, type: 3}
+  m_Name: RigMotion_BakedClipsAsset
+  m_EditorClassIdentifier: 
+  AnimationsTexX: {fileID: 2800000, guid: a3b3ad9a01e3d994da72cd194d0f60b1, type: 2}
+  AnimationsTexY: {fileID: 2800000, guid: 80b8874b98fa8d14ea4e9fc1e1167131, type: 2}
+  AnimationsTexZ: {fileID: 2800000, guid: 5481e03e04bf18446ad930012d7d161e, type: 2}
+  totalFrames: 56
+  AmountOfObjects: 3
+  clips:
+  - clipName: move
+    startFrame: 0
+    frameRate: 24
+    frameCount: 56

@@ -81,10 +81,10 @@ public class GPUBoneAnimationController : MonoBehaviour
             return false;
         }
         
-        var skinnedMeshRenderer = this.GetComponentsInChildren<SkinnedMeshRenderer>();
-        if(skinnedMeshRenderer == null || skinnedMeshRenderer.Length == 0)
+        var MeshRenderer = this.GetComponentsInChildren<MeshRenderer>();
+        if(MeshRenderer == null || MeshRenderer.Length == 0)
         {
-            Debug.LogError("SkinnedMeshRenderer component not found on the GameObject.");
+            Debug.LogError("MeshRenderer component not found on the GameObject.");
             return false;
         }
         // if (renderer.sharedMaterial == null)

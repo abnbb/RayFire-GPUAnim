@@ -102,8 +102,9 @@ public static class FBXWithBoneClipInfo
         return !string.IsNullOrEmpty(assetPath);
     }
 
-    private static void SaveBoneWeights(GameObject instance, string assetName)
+    private static void ProcessMesh(GameObject instance, string assetName,GameObject GameRoot)
     {
+
         List<Transform> Bones = new List<Transform>();
         CollectBonesAndInfos(instance, Bones, null);
         int BonesCount = Bones.Count;
@@ -111,35 +112,47 @@ public static class FBXWithBoneClipInfo
         {
             return;
         }
+
+        
+        int i = 0;
         foreach (var SKedMR in instance.GetComponentsInChildren<SkinnedMeshRenderer>())
         {
+            GameObject GameChild = new GameObject(assetName+"_"+i++);
+
             Mesh mesh = UnityEngine.Object.Instantiate(SKedMR.sharedMesh);
-            TranlateMeshSpace(SKedMR.transform.localToWorldMatrix,  mesh);
-            mesh.name = assetName  + "_GPUABonenimMesh";
-
-            int vertexCount = mesh.vertexCount;
-            // Color[] indexColors = new Color[vertexCount];
-            List<Vector4> boneIndices = new List<Vector4>(vertexCount);
-            List<Vector4> boneWeight = new List<Vector4>(vertexCount);
-            // Color indexColor = new Color((i + 0.5f) / BonesCount, 0f, 0f, 1f);
-            for (int j = 0; j < vertexCount; j++)
-            {
-                var boneWeights = mesh.boneWeights[j];
-                Vector4 Indices = new Vector4(boneWeights.boneIndex0, boneWeights.boneIndex1, boneWeights.boneIndex2, boneWeights.boneIndex3);
-                Indices += new Vector4(0.5f,0.5f,0.5f,0.5f);
-                Indices /= BonesCount; // Normalize to [0, 1] range
-                boneIndices.Add(Indices);
-                boneWeight.Add(new Vector4(boneWeights.weight0, boneWeights.weight1, boneWeights.weight2, boneWeights.weight3));
-                // indexColors[j] = new Color(boneIndices.x, boneIndices.y, boneIndices.z, boneIndices.w);
-            }
-
-            // mesh.colors = indexColors;
-            mesh.SetUVs(1, boneWeight);
-            mesh.SetUVs(2, boneIndices);
+            mesh.name = assetName  + "_GPUABonenimMesh_"+i;
+            TranlateMeshSpace(SKedMR.transform.localToWorldMatrix, mesh);
+            
+            SaveBoneWeights(mesh, BonesCount);
+            
             SKedMR.sharedMesh = mesh;
             EnsureFolder(MeshFolder, assetName);
             SaveMeshAsset(mesh, MeshFolder +"/"+ assetName + "/"+ mesh.name + ".asset");
+
+            GameChild.transform.SetParent(GameRoot.transform, false);
+            GameChild.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var targetRenderer = GameChild.AddComponent<MeshRenderer>();
+            AssignGPUAnimationMaterial(targetRenderer, instance.name);
         }
+    }
+
+    private static void SaveBoneWeights(Mesh mesh,int BonesCount)
+    {
+        int vertexCount = mesh.vertexCount;
+        List<Vector4> boneIndices = new List<Vector4>(vertexCount);
+        List<Vector4> boneWeight = new List<Vector4>(vertexCount);
+        for (int j = 0; j < vertexCount; j++)
+        {
+            var boneWeights = mesh.boneWeights[j];
+            Vector4 Indices = new Vector4(boneWeights.boneIndex0, boneWeights.boneIndex1, boneWeights.boneIndex2, boneWeights.boneIndex3);
+            Indices += new Vector4(0.5f,0.5f,0.5f,0.5f);
+            Indices /= BonesCount; // Normalize to [0, 1] range
+            boneIndices.Add(Indices);
+            boneWeight.Add(new Vector4(boneWeights.weight0, boneWeights.weight1, boneWeights.weight2, boneWeights.weight3));
+        }
+
+        mesh.SetUVs(1, boneWeight);
+        mesh.SetUVs(2, boneIndices);
     }
 
     private static void TranlateMeshSpace(in Matrix4x4 localToWorldMatrix,  Mesh mesh)
@@ -171,7 +184,6 @@ public static class FBXWithBoneClipInfo
 
         foreach( var renderer in meshRenderer)
         {
-            
             if(renderer.bones != null)
             {
                 foreach(var bone in renderer.bones)
@@ -184,7 +196,8 @@ public static class FBXWithBoneClipInfo
                     {
                         objInfos.Add(new ObjInfo
                         {
-                            BindPose = bone.worldToLocalMatrix
+                            // BindPose = bone.worldToLocalMatrix
+                            BindPose = renderer.sharedMesh.bindposes[Array.IndexOf(renderer.bones, bone)]
                         });
                     }
                 }
@@ -274,7 +287,6 @@ public static class FBXWithBoneClipInfo
                     texX[index] = matrix.GetRow(0);
                     texY[index] = matrix.GetRow(1);
                     texZ[index] = matrix.GetRow(2);
-
                     frameIndex++;
                     writtenFrameCount++;
                 }
@@ -325,25 +337,22 @@ public static class FBXWithBoneClipInfo
     {
         GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
         instance.transform.localScale = Vector3.one;
-        SaveBoneWeights(instance, instance.name);
+        GameObject GameRoot = new GameObject(instance.name);
 
-        GPUBoneAnimationController controller = instance.GetComponent<GPUBoneAnimationController>();
+        ProcessMesh(instance, instance.name, GameRoot);
+
+        GPUBoneAnimationController controller = GameRoot.GetComponent<GPUBoneAnimationController>();
         if (controller == null)
         {
-            controller = instance.AddComponent<GPUBoneAnimationController>();
+            controller = GameRoot.AddComponent<GPUBoneAnimationController>();
         }
 
         controller.bakedClipsAsset = bakedClipsAsset;
-        var targetRenderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>();
-
-        foreach (var targetRenderer in targetRenderers)
-        {
-            AssignGPUAnimationMaterial(targetRenderer, instance.name);
-        }
 
         DeleteAssetIfExists(prefabPath);
-        PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
+        PrefabUtility.SaveAsPrefabAsset(GameRoot, prefabPath);
         UnityEngine.Object.DestroyImmediate(instance);
+        UnityEngine.Object.DestroyImmediate(GameRoot);
     }
 
     private static void AssignGPUAnimationMaterial(Renderer targetRenderer, string assetName)
