@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc728264d94ffb946a611ea6807ec083, type: 3}
+  m_Name: Ch03_nonPBR_BakedClipsAsset
+  m_EditorClassIdentifier: 
+  AnimationsTexX: {fileID: 2800000, guid: 36705597f553c854ba3f593c48b1a096, type: 2}
+  AnimationsTexY: {fileID: 2800000, guid: 365681768404d734d808794caf3c24db, type: 2}
+  AnimationsTexZ: {fileID: 2800000, guid: 81505d6a25a74014eb0c3871cdb821ef, type: 2}
+  totalFrames: 1
+  AmountOfObjects: 52
+  clips:
+  - clipName: mixamo.com
+    startFrame: 0
+    frameRate: 30
+    frameCount: 1

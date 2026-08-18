@@ -104,82 +104,93 @@ public static class FBXWithBoneClipInfo
 
     private static void SaveBoneWeights(GameObject instance, string assetName)
     {
-        List<Transform> Bones = CollectBones(instance);
+        List<Transform> Bones = new List<Transform>();
+        CollectBonesAndInfos(instance, Bones, null);
         int BonesCount = Bones.Count;
         if (BonesCount == 0)
         {
             return;
         }
-
-        Mesh mesh = CollectMesh(instance);
-        mesh.name = assetName + "_"  + "_GPUABonenimMesh_";
-
-        int vertexCount = mesh.vertexCount;
-        Color[] indexColors = new Color[vertexCount];
-        List<Vector4> boneWeight = new List<Vector4>(vertexCount);
-        // Color indexColor = new Color((i + 0.5f) / BonesCount, 0f, 0f, 1f);
-        for (int j = 0; j < vertexCount; j++)
+        foreach (var SKedMR in instance.GetComponentsInChildren<SkinnedMeshRenderer>())
         {
-            var boneWeights = mesh.boneWeights[j];
-            Vector4 boneIndices = new Vector4(boneWeights.boneIndex0, boneWeights.boneIndex1, boneWeights.boneIndex2, boneWeights.boneIndex3);
-            boneIndices += new Vector4(0.5f,0.5f,0.5f,0.5f);
-            boneIndices /= BonesCount; // Normalize to [0, 1] range
-            boneWeight.Add(new Vector4(boneWeights.weight0, boneWeights.weight1, boneWeights.weight2, boneWeights.weight3));
-            indexColors[j] = new Color(boneIndices.x, boneIndices.y, boneIndices.z, boneIndices.w);
-        }
+            Mesh mesh = UnityEngine.Object.Instantiate(SKedMR.sharedMesh);
+            TranlateMeshSpace(SKedMR.transform.localToWorldMatrix,  mesh);
+            mesh.name = assetName  + "_GPUABonenimMesh";
 
-        mesh.colors = indexColors;
-        mesh.SetUVs(1, boneWeight);
-        var skinnedMeshRenderer = instance.GetComponentsInChildren<SkinnedMeshRenderer>();
-        if(skinnedMeshRenderer != null && skinnedMeshRenderer[0] != null)
-        {
-            skinnedMeshRenderer[0].sharedMesh = mesh;
+            int vertexCount = mesh.vertexCount;
+            // Color[] indexColors = new Color[vertexCount];
+            List<Vector4> boneIndices = new List<Vector4>(vertexCount);
+            List<Vector4> boneWeight = new List<Vector4>(vertexCount);
+            // Color indexColor = new Color((i + 0.5f) / BonesCount, 0f, 0f, 1f);
+            for (int j = 0; j < vertexCount; j++)
+            {
+                var boneWeights = mesh.boneWeights[j];
+                Vector4 Indices = new Vector4(boneWeights.boneIndex0, boneWeights.boneIndex1, boneWeights.boneIndex2, boneWeights.boneIndex3);
+                Indices += new Vector4(0.5f,0.5f,0.5f,0.5f);
+                Indices /= BonesCount; // Normalize to [0, 1] range
+                boneIndices.Add(Indices);
+                boneWeight.Add(new Vector4(boneWeights.weight0, boneWeights.weight1, boneWeights.weight2, boneWeights.weight3));
+                // indexColors[j] = new Color(boneIndices.x, boneIndices.y, boneIndices.z, boneIndices.w);
+            }
+
+            // mesh.colors = indexColors;
+            mesh.SetUVs(1, boneWeight);
+            mesh.SetUVs(2, boneIndices);
+            SKedMR.sharedMesh = mesh;
+            EnsureFolder(MeshFolder, assetName);
+            SaveMeshAsset(mesh, MeshFolder +"/"+ assetName + "/"+ mesh.name + ".asset");
         }
-        AssetDatabase.CreateFolder(MeshFolder, assetName);
-        SaveMeshAsset(mesh, MeshFolder +"/"+ assetName + "/"+ mesh.name + ".asset");
+    }
+
+    private static void TranlateMeshSpace(in Matrix4x4 localToWorldMatrix,  Mesh mesh)
+    {
+        Vector3[] vertices = mesh.vertices;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector3 worldPos = localToWorldMatrix.MultiplyPoint3x4(vertices[i]);
+            vertices[i] = worldPos;
+        }
+        mesh.vertices = vertices;
+        mesh.RecalculateBounds();
     }
 
     private static int CountBones(GameObject sourceObject)
     {
-        return CollectBones(sourceObject).Count;
-    }
-
-    private static List<Transform> CollectBones(GameObject sourceObject)
-    {
         List<Transform> bones = new List<Transform>();
-        var meshRenderer = sourceObject.GetComponentsInChildren<SkinnedMeshRenderer>();
-        if (meshRenderer != null && meshRenderer[0].bones != null)
-        {
-            bones = meshRenderer[0].bones != null ? new List<Transform>(meshRenderer[0].bones) : new List<Transform>();
-        }
-        return bones;
+        CollectBonesAndInfos(sourceObject, bones, null);
+        return bones.Count;
     }
 
-    private static Mesh CollectMesh(GameObject sourceObject)
+    private static void CollectBonesAndInfos(GameObject sourceObject, List<Transform> bones, List<ObjInfo> objInfos)
     {
-        Mesh mesh = null;
         var meshRenderer = sourceObject.GetComponentsInChildren<SkinnedMeshRenderer>();
-        if (meshRenderer != null && meshRenderer[0].bones != null)
+        if(meshRenderer.Length <= 0)
         {
-            mesh = meshRenderer[0].sharedMesh;
+            return;
         }
-        return mesh;
-    }
-    private static List<ObjInfo> loadBoneInfos(GameObject instance)
-    {
-        List<ObjInfo> objInfos = new List<ObjInfo>();
-        var skinnedMeshRenderer = instance.GetComponentsInChildren<SkinnedMeshRenderer>();
-        if(skinnedMeshRenderer != null && skinnedMeshRenderer[0].sharedMesh)
+
+        foreach( var renderer in meshRenderer)
         {
-            foreach(var pose in skinnedMeshRenderer[0].sharedMesh.bindposes)
+            
+            if(renderer.bones != null)
             {
-                ObjInfo oi = new ObjInfo();
-                oi.BindPose = pose;
-                objInfos.Add(oi);
+                foreach(var bone in renderer.bones)
+                {
+                    if(bones != null)
+                    {
+                        bones.Add(bone);
+                    }
+                    if(objInfos != null)
+                    {
+                        objInfos.Add(new ObjInfo
+                        {
+                            BindPose = bone.worldToLocalMatrix
+                        });
+                    }
+                }
             }
+
         }
-        
-        return objInfos;
     }
 
     private static List<ClipInfo> LoadClipInfos(string assetPath)
@@ -227,10 +238,14 @@ public static class FBXWithBoneClipInfo
         Color[] texY = new Color[texX.Length];
         Color[] texZ = new Color[texX.Length];
 
+        //Root.WorlToLocalMatrix == I
         GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
+        instance.transform.localScale = Vector3.one;
         
-        List<Transform> ObjTrans = CollectBones(instance);
-        List<ObjInfo> objInfos = loadBoneInfos(instance);
+        List<Transform> ObjTrans = new List<Transform>();
+        List<ObjInfo> objInfos = new List<ObjInfo>();
+
+        CollectBonesAndInfos(instance, ObjTrans, objInfos);
 
 
         for (int i = 0; i < ObjTrans.Count; i++)
@@ -309,17 +324,23 @@ public static class FBXWithBoneClipInfo
     private static void GenerateGPUAnimationPrefab(GameObject sourceObject, BakedClipsAsset bakedClipsAsset, string prefabPath)
     {
         GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
-        SaveBoneWeights(instance, sourceObject.name);
+        instance.transform.localScale = Vector3.one;
+        SaveBoneWeights(instance, instance.name);
 
-        GPUAnimationController controller = instance.GetComponent<GPUAnimationController>();
+        GPUBoneAnimationController controller = instance.GetComponent<GPUBoneAnimationController>();
         if (controller == null)
         {
-            controller = instance.AddComponent<GPUAnimationController>();
+            controller = instance.AddComponent<GPUBoneAnimationController>();
         }
 
         controller.bakedClipsAsset = bakedClipsAsset;
-        var targetRenderer = instance.GetComponentInChildren<Renderer>();
-        AssignGPUAnimationMaterial(targetRenderer, sourceObject.name);
+        var targetRenderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>();
+
+        foreach (var targetRenderer in targetRenderers)
+        {
+            AssignGPUAnimationMaterial(targetRenderer, instance.name);
+        }
+
         DeleteAssetIfExists(prefabPath);
         PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
         UnityEngine.Object.DestroyImmediate(instance);
@@ -333,7 +354,7 @@ public static class FBXWithBoneClipInfo
             Debug.LogWarning("Shader was not found: " + ShaderName);
             return;
         }
-        string materialName = assetName + "_GPUAnim";
+        string materialName = assetName + "_GPUBoneAnim";
         string materialPath = MaterialFolder + "/" + materialName + ".mat";
         Material existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
         if (existingMaterial != null)

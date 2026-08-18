@@ -28,8 +28,8 @@ Shader "Custom/GPUBoneAnim"
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
-                float4 color :COLOR;
                 float4 weights : TEXCOORD1;
+                float4 index :TEXCOORD2;
             };
 
             struct v2f
@@ -71,7 +71,7 @@ Shader "Custom/GPUBoneAnim"
             {
                 v2f o;
                 float3 worldPos;
-                applyGPUAnim(v.vertex, v.color, v.weights, worldPos);
+                applyGPUAnim(v.vertex, v.index, v.weights, worldPos);
                 // float4 objVertex = mul(MM, float4(worldPos.xyz,1));
                 //每个子物体有不同的UNITY_MATRIX_M矩阵，将原点位于0，0，0的子物体变化到正确的位置
                 o.vertex = UnityObjectToClipPos(float4(worldPos.xyz, 1.0));

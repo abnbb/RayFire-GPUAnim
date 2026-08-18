@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc728264d94ffb946a611ea6807ec083, type: 3}
+  m_Name: Flair_BakedClipsAsset
+  m_EditorClassIdentifier: 
+  AnimationsTexX: {fileID: 2800000, guid: f52338e29bae5a148a953d6342902fe0, type: 2}
+  AnimationsTexY: {fileID: 2800000, guid: 83b25868ce65335408d8756eff734d9e, type: 2}
+  AnimationsTexZ: {fileID: 2800000, guid: b5cf19a9fe0330a4d959e31b16b4cd55, type: 2}
+  totalFrames: 30
+  AmountOfObjects: 52
+  clips:
+  - clipName: mixamo.com
+    startFrame: 0
+    frameRate: 30
+    frameCount: 30
