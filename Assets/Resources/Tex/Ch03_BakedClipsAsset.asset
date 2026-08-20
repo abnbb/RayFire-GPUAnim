@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc728264d94ffb946a611ea6807ec083, type: 3}
+  m_Name: Ch03_BakedClipsAsset
+  m_EditorClassIdentifier: 
+  AnimationsTexX: {fileID: 2800000, guid: e578526011b91fc4999a2dc9d3a080f4, type: 2}
+  AnimationsTexY: {fileID: 2800000, guid: 26d94f51c234fc6458e999645f34e24a, type: 2}
+  AnimationsTexZ: {fileID: 2800000, guid: b36bda22788046f49bab3faaeab64c8b, type: 2}
+  totalFrames: 30
+  AmountOfObjects: 52
+  clips:
+  - clipName: Flair
+    startFrame: 0
+    frameRate: 30
+    frameCount: 30

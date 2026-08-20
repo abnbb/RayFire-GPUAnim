@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -51,8 +52,23 @@ public static class FBXWithBoneClipInfo
             Debug.LogWarning("Only project assets can be baked.");
             return;
         }
+        
+        string name = Path.GetFileNameWithoutExtension(assetPath);
+        string animFolder = "Assets/Resources/anima/"+name;
+        
+        if (!AssetDatabase.IsValidFolder(animFolder))
+        {
+            Debug.LogWarning("The selected asset does not contain any AnimationClips.");
+            return;
+        }
 
-        List<ClipInfo> clipInfos = LoadClipInfos(assetPath);
+        string[] animationClipFbx = Directory.GetFiles(animFolder,"*.fbx", SearchOption.AllDirectories);
+        List<ClipInfo> clipInfos = new List<ClipInfo>();
+        foreach (string clipPath in animationClipFbx)
+        {
+            LoadClipInfos(clipPath, clipInfos);
+        }
+       
         int totalFrameCount = GetTotalFrameCount(clipInfos);
         if (totalFrameCount <= 0)
         {
@@ -206,9 +222,9 @@ public static class FBXWithBoneClipInfo
         }
     }
 
-    private static List<ClipInfo> LoadClipInfos(string assetPath)
+    private static void LoadClipInfos(string assetPath, List<ClipInfo> clipInfos)
     {
-        List<ClipInfo> clipInfos = new List<ClipInfo>();
+        // List<ClipInfo> clipInfos = new List<ClipInfo>();
         UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
 
         foreach (UnityEngine.Object asset in assets)
@@ -229,8 +245,6 @@ public static class FBXWithBoneClipInfo
                 clip = clip
             });
         }
-
-        return clipInfos;
     }
 
 
