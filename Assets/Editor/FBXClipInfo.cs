@@ -12,7 +12,7 @@ public static class FBXClipInfo
     private const string PrefabFolder = "Assets/Res/prefab";
     private const string MaterialFolder = "Assets/Res/materials";
     private const string MeshFolder = "Assets/Resources/meshes";
-    private const string ShaderName = "Custom/GPUAnim";
+    private const string ShaderName = "Custom/GPUAnimVertexColor";
 
     private struct ClipInfo
     {
@@ -119,16 +119,17 @@ public static class FBXClipInfo
             mesh.name = assetName + "_" + childTransform.name + "_GPUAnimMesh_" + i;
 
             int vertexCount = mesh.vertexCount;
-            Color[] indexColors = new Color[vertexCount];
-            Color indexColor = new Color((i + 0.5f) / animatedObjectCount, 0f, 0f, 1f);
+            List<Vector2> indexColors = new List<Vector2>();
+            Vector2 indexColor = new Vector2((i + 0.5f) / animatedObjectCount, 0f);
             for (int j = 0; j < vertexCount; j++)
             {
-                indexColors[j] = indexColor;
+                indexColors.Add(indexColor);
             }
 
-            mesh.colors = indexColors;
+            mesh.SetUVs(1, indexColors);
             meshFilter.sharedMesh = mesh;
-            SaveMeshAsset(mesh, MeshFolder + "/" + mesh.name + ".asset");
+            EnsureFolder(MeshFolder, assetName);
+            SaveMeshAsset(mesh, MeshFolder + "/" + assetName + "/" + mesh.name + ".asset");
         }
     }
 
@@ -334,12 +335,6 @@ public static class FBXClipInfo
         }
         string materialName = assetName + "_GPUAnim";
         string materialPath = MaterialFolder + "/" + materialName + ".mat";
-        Material existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-        if (existingMaterial != null)
-        {
-            targetRenderer.sharedMaterial = existingMaterial;
-            return;
-        }
 
         Material material = new Material(shader);
         material.name = materialName;
