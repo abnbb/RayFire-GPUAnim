@@ -73,6 +73,11 @@ public class GPUAnimationController : MonoBehaviour
             Debug.LogError("MeshFilter component not found on the GameObject.");
             return false;
         }
+        // if (renderer.sharedMaterial == null)
+        // {
+        //     Debug.LogError("Material is not assigned to the Renderer.");
+        //     return false;
+        // }
         return true;
     }
 
@@ -81,13 +86,19 @@ public class GPUAnimationController : MonoBehaviour
         if (bakedClipsAsset == null)
             return;
 
-        var m = renderers[0].sharedMaterials;
-        foreach (var mat in m)
-        {
-            mat.SetTexture("_MainTex1", bakedClipsAsset.AnimationsTexX);
-            mat.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
-            mat.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
-        }
+        // Set the textures to the material
+        // foreach(Renderer R in renderers)
+        // {
+        //     renderer.GetPropertyBlock(propertyBlock);
+        //     propertyBlock.SetTexture("_MainTex1", bakedClipsAsset.AnimationsTexX);
+        //     propertyBlock.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
+        //     propertyBlock.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
+        //     renderer.SetPropertyBlock(propertyBlock);
+        // }
+        var m = renderers[0].sharedMaterial;
+        m.SetTexture("_MainTex1", bakedClipsAsset.AnimationsTexX);
+        m.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
+        m.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
         // m.SetFloat("_CobjsOffset", 0.5f/bakedClipsAsset.AmountOfObjects);
         // Apply the property block to the renderer
         currentClipInfo = bakedClipsAsset.clips[clipIndex];
@@ -129,11 +140,8 @@ public class GPUAnimationController : MonoBehaviour
         if(renderers == null)
             return;
 
-        var m = renderers[0].sharedMaterials;
-        foreach (var mat in m)
-        {
-            mat.SetFloat("_frameState", frameIndex);
-        }
+        var m = renderers[0].sharedMaterial;
+        m.SetFloat("_frameState", frameIndex);
         // renderer.SetPropertyBlock(propertyBlock);
     }
 }

@@ -128,8 +128,7 @@ public static class FBXClipInfo
 
             mesh.colors = indexColors;
             meshFilter.sharedMesh = mesh;
-            EnsureFolder(MeshFolder, assetName);
-            SaveMeshAsset(mesh, MeshFolder + "/"+assetName+ "/"+ mesh.name + ".asset");
+            SaveMeshAsset(mesh, MeshFolder + "/" + mesh.name + ".asset");
         }
     }
 
@@ -318,14 +317,14 @@ public static class FBXClipInfo
             }
 
             
-            AssignGPUAnimationMaterial(targetRenderer, sourceObject.name,child.GetComponent<MeshFilter>().sharedMesh.subMeshCount);
+            AssignGPUAnimationMaterial(targetRenderer, sourceObject.name);
         }
         DeleteAssetIfExists(prefabPath);
         PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
         UnityEngine.Object.DestroyImmediate(instance);
     }
 
-    private static void AssignGPUAnimationMaterial(Renderer targetRenderer, string assetName, int subMeshCount)
+    private static void AssignGPUAnimationMaterial(Renderer targetRenderer, string assetName)
     {
         Shader shader = Shader.Find(ShaderName);
         if (shader == null)
@@ -333,19 +332,20 @@ public static class FBXClipInfo
             Debug.LogWarning("Shader was not found: " + ShaderName);
             return;
         }
-        Material[] materials = new Material[subMeshCount];
-        for (int i = 0; i < subMeshCount; i++)
+        string materialName = assetName + "_GPUAnim";
+        string materialPath = MaterialFolder + "/" + materialName + ".mat";
+        Material existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+        if (existingMaterial != null)
         {
-            string materialName = assetName + "_GPUAnim"+$"_{i}";
-            string materialPath = MaterialFolder + "/" + materialName + ".mat";
-
-            Material material = new Material(shader);
-            material.name = materialName;
-            DeleteAssetIfExists(materialPath);
-            AssetDatabase.CreateAsset(material, materialPath);
-            materials[i] = material;
+            targetRenderer.sharedMaterial = existingMaterial;
+            return;
         }
-        targetRenderer.sharedMaterials = materials;
+
+        Material material = new Material(shader);
+        material.name = materialName;
+        DeleteAssetIfExists(materialPath);
+        AssetDatabase.CreateAsset(material, materialPath);
+        targetRenderer.sharedMaterial = material;
     }
 
     private static Renderer FindPlayableRenderer(GameObject instance)
@@ -431,7 +431,7 @@ public static class FBXClipInfo
         EnsureFolder("Assets", "Res");
         EnsureFolder("Assets/Res", "prefab");
         EnsureFolder("Assets/Res", "materials");
-        EnsureFolder("Assets/Resources", "meshes");
+        EnsureFolder("Assets/Res", "meshes");
     }
 
     private static void EnsureFolder(string parentFolder, string folderName)
