@@ -21,7 +21,48 @@
             color 255 0 0
     )
 
-    fn processObj obj =
+    fn getAxisVector axisIndex =
+    (
+        case axisIndex of
+        (
+            1: [1,0,0] -- X
+            2: [0,1,0] -- Y
+            3: [0,0,1] -- Z
+            default: [1,0,0]
+        )
+    )
+
+    fn rotatePivotOnly obj axisVec angleDeg =
+    (
+        local rotVal = angleaxis angleDeg axisVec
+        local rotValInv = inverse (rotVal as quat)
+
+        animate off
+        (
+            in coordsys local obj.rotation *= rotValInv
+            obj.objectOffsetPos *= rotValInv
+            obj.objectOffsetRot *= rotValInv
+        )
+    )
+
+    fn applyPivotOptions obj doSetPivot pivotPos doRotatePivot axisIndex angleDeg =
+    (
+        with undo off
+        (
+            if doSetPivot do
+            (
+                in coordsys world obj.pivot = pivotPos
+            )
+
+            if doRotatePivot do
+            (
+                local axisVec = getAxisVector axisIndex
+                rotatePivotOnly obj axisVec angleDeg
+            )
+        )
+    )
+
+    fn processObj obj doSetPivot pivotPos doRotatePivot axisIndex angleDeg =
     (
         if not (canConvertTo obj Editable_Poly) then
         (
@@ -30,10 +71,11 @@
         )
         else
         (
+            applyPivotOptions obj doSetPivot pivotPos doRotatePivot axisIndex angleDeg
+
             convertToPoly obj
 
             local faceCount = polyop.getNumFaces obj
-
             polyop.setMapSupport obj vertexColorChannel true
 
             local totalMapVerts = 0
@@ -54,10 +96,8 @@
                 local faceDegree = polyop.getFaceDeg obj f
                 local mapFace = #()
 
-                -- ??????????
                 polyop.setFaceSmoothGroup obj #{f} sgMask
 
-                -- ??????????,???? ID ????????
                 for i = 1 to faceDegree do
                 (
                     polyop.setMapVert obj vertexColorChannel mapVertIndex vc
@@ -73,7 +113,6 @@
 
             update obj
 
-            -- ??????
             local sg1Count = 0
             local sg2Count = 0
 
@@ -91,19 +130,50 @@
         )
     )
 
-    if selection.count == 0 then
+    rollout MatIDToVC_Rollout "MatID To Vertex Color"
     (
-        messageBox "Please select object first."
-    )
-    else
-    (
-        local count = 0
+        groupBox grpPivotPos "Pivot Position" pos:[8,8] width:264 height:88
 
-        for obj in selection do
+        checkbox chkSetPivot "Set pivot position" pos:[20,30] checked:true
+
+        spinner spnPivotX "X" pos:[28,54] width:74 type:#float range:[-999999,999999,0]
+        spinner spnPivotY "Y" pos:[108,54] width:74 type:#float range:[-999999,999999,0]
+        spinner spnPivotZ "Z" pos:[188,54] width:74 type:#float range:[-999999,999999,0]
+
+        groupBox grpPivotRot "Pivot Rotation" pos:[8,104] width:264 height:82
+
+        checkbox chkRotatePivot "Rotate pivot" pos:[20,126] checked:true
+
+        dropdownList ddlAxis "Axis" pos:[28,148] width:74 items:#("X", "Y", "Z") selection:1
+        spinner spnAngle "Deg" pos:[126,150] width:118 type:#float range:[-3600,3600,90]
+
+        button btnRun "Process Selected" pos:[8,198] width:264 height:30
+
+        on btnRun pressed do
         (
-            if processObj obj do count += 1
-        )
+            if selection.count == 0 then
+            (
+                messageBox "Please select object first."
+            )
+            else
+            (
+                local count = 0
+                local pivotPos = [spnPivotX.value, spnPivotY.value, spnPivotZ.value]
 
-        format "Done. Processed % object(s).\n" count
+                for obj in selection do
+                (
+                    if processObj obj chkSetPivot.checked pivotPos chkRotatePivot.checked ddlAxis.selection spnAngle.value do
+                    (
+                        count += 1
+                    )
+                )
+
+                format "Done. Processed % object(s).\n" count
+                destroyDialog MatIDToVC_Rollout
+            )
+        )
     )
+
+    try(destroyDialog MatIDToVC_Rollout) catch()
+    createDialog MatIDToVC_Rollout 280 240
 )

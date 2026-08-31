@@ -12,7 +12,7 @@ public static class FBXClipInfo
     private const string PrefabFolder = "Assets/Res/prefab";
     private const string MaterialFolder = "Assets/Res/materials";
     private const string MeshFolder = "Assets/Resources/meshes";
-    private const string ShaderName = "Custom/GPUAnimVertexColor";
+    private const string ShaderName = "Custom/GPUAnim";
 
     private struct ClipInfo
     {
@@ -319,6 +319,7 @@ public static class FBXClipInfo
 
             
             AssignGPUAnimationMaterial(targetRenderer, sourceObject.name);
+            Debug.Log($"Assigned GPU animation material to {child.name} in prefab {sourceObject.name}");
         }
         DeleteAssetIfExists(prefabPath);
         PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
@@ -335,6 +336,12 @@ public static class FBXClipInfo
         }
         string materialName = assetName + "_GPUAnim";
         string materialPath = MaterialFolder + "/" + materialName + ".mat";
+        Material existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+        if (existingMaterial != null)
+        {
+            targetRenderer.sharedMaterial = existingMaterial;
+            return;
+        }
 
         Material material = new Material(shader);
         material.name = materialName;
@@ -426,7 +433,7 @@ public static class FBXClipInfo
         EnsureFolder("Assets", "Res");
         EnsureFolder("Assets/Res", "prefab");
         EnsureFolder("Assets/Res", "materials");
-        EnsureFolder("Assets/Res", "meshes");
+        EnsureFolder("Assets/Resources", "meshes");
     }
 
     private static void EnsureFolder(string parentFolder, string folderName)
