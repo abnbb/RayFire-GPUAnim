@@ -12,7 +12,7 @@ public static class FBXClipInfo
     private const string PrefabFolder = "Assets/Res/prefab";
     private const string MaterialFolder = "Assets/Res/materials";
     private const string MeshFolder = "Assets/Resources/meshes";
-    private const string ShaderName = "Custom/GPUAnim";
+    private const string ShaderName = "Custom/GPUAnimVertexColor";
 
     private struct ClipInfo
     {
@@ -115,6 +115,7 @@ public static class FBXClipInfo
         {
             Transform childTransform = renderableObjects[i];
             MeshFilter meshFilter = childTransform.GetComponent<MeshFilter>();
+            MeshRenderer meshRenderer = childTransform.GetComponent<MeshRenderer>();
             Mesh mesh = UnityEngine.Object.Instantiate(meshFilter.sharedMesh);
             mesh.name = assetName + "_" + childTransform.name + "_GPUAnimMesh_" + i;
 
@@ -244,6 +245,7 @@ public static class FBXClipInfo
                     }
 
                     clipInfo.clip.SampleAnimation(instance, time);
+                    //ObjTrans[i].localToWorldMatrix 不包含子物体再父物体空间下的变换
                     Matrix4x4 matrix = ObjTrans[i].localToWorldMatrix;
                     var index = i * totalFrameCount + frameIndex;
                     texX[index] = matrix.GetRow(0);

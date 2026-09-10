@@ -1,0 +1,167 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!43 &4300000
+Mesh:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: rayfireTest04_Box001_frag_033_GPUAnimMesh_32
+  serializedVersion: 11
+  m_SubMeshes:
+  - serializedVersion: 2
+    firstByte: 0
+    indexCount: 48
+    topology: 0
+    baseVertex: 0
+    firstVertex: 0
+    vertexCount: 30
+    localAABB:
+      m_Center: {x: 0.024084605, y: 0.19118077, z: 0.02423654}
+      m_Extent: {x: 0.029633153, y: 0.009332009, z: 0.0056797136}
+  m_Shapes:
+    vertices: []
+    shapes: []
+    channels: []
+    fullWeights: []
+  m_BindPose: []
+  m_BoneNameHashes: 
+  m_RootBoneNameHash: 0
+  m_BonesAABB: []
+  m_VariableBoneCountWeights:
+    m_Data: 
+  m_MeshCompression: 0
+  m_IsReadable: 0
+  m_KeepVertices: 1
+  m_KeepIndices: 1
+  m_IndexFormat: 0
+  m_IndexBuffer: 00000100020003000400050003000500060007000800090009000a00070009000b000a000c000d000e000e000f000c000f0010000c001100120013001300140011001400150011001600170018001600180019001a001b001c001a001c001d00
+  m_VertexData:
+    serializedVersion: 3
+    m_VertexCount: 30
+    m_Channels:
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 3
+    - stream: 0
+      offset: 12
+      format: 0
+      dimension: 3
+    - stream: 0
+      offset: 24
+      format: 0
+      dimension: 4
+    - stream: 0
+      offset: 40
+      format: 2
+      dimension: 4
+    - stream: 0
+      offset: 44
+      format: 0
+      dimension: 2
+    - stream: 0
+      offset: 52
+      format: 0
+      dimension: 2
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    m_DataSize: 1800
+    _typelessdata: f6dd2f3dd3943d3eee12f53c00000000000000000000803f0c51423f1caa263f00000000000080bfff0000ff0000000000000000b014283e000000007917303de9a73d3e26eef23c00000000000000000000803f0c51423f1caa263f00000000000080bfff0000ff52b83a392994093ab014283e00000000461b333da6463e3eee12f53c00000000000000000000803f0c51423f1caa263f00000000000080bfff0000ffec91083b0ad72331b014283e0000000099d0b5bb38534d3eee12f53c000000000000803f00000000000080bf0000000000000000000080bf000000ff609ddb3e00000000b014283e0000000027075c3d38534d3eee12f53c000000000000803f00000000000080bf0000000000000000000080bf000000ff0056883e00000000b014283e00000000d858223d38534d3e7c04983c000000000000803f00000000000080bf0000000000000000000080bf000000ffb11f9c3e6b818a3eb014283e00000000d7b7b8ba38534d3e7ed0af3c000000000000803f00000000000080bf0000000000000000000080bf000000ff64ccd53e162c4e3eb014283e000000000aeea33b45833b3e0537d13c53a4a43d47e976bf86cc80be871d7f3fc31caa3d00000000000080bfff0000ff3fb5b53dc333143cb014283e00000000db5f0f3d52de3e3e12d4b83c53a4a43d47e976bf86cc80be871d7f3fc61caa3d00000000000080bfff0000ff08a4183e4efd783cb014283e000000007917303de9a73d3e26eef23c00000000000000000000803f871d7f3fb81caa3d00000000000080bfff0000ffcebd283e40c10d3ab014283e00000000999d633b8f363a3eee12f53c00000000000000000000803f871d7f3f7c1caa3d00000000000080bfff0000ff5608af3d362e7e31b014283e00000000f6dd2f3dd3943d3eee12f53c00000000000000000000803f871d7f3fbf1caa3d00000000000080bfff0000fffa9d283ea6113a31b014283e000000007917303de9a73d3e26eef23c00000000000000000000803f000000000000803f00000000000080bfff0000ff1c19ac39e542d73cb014283e00000000db5f0f3d52de3e3e12d4b83cb8d3133febfbc8bec44237bf000000008477603ffd2cf6be000080bfff0000ffe124173c33c73b3db014283e00000000d858223d38534d3e7c04983c000000000000803f000000000000000000000000000080bf000080bfff0000ff29f81a3d054d0d3db014283e0000000027075c3d38534d3eee12f53c00000000000000000000803f000000000000803f00000000000080bfff0000ff0074dc3c00000000b014283e00000000461b333da6463e3eee12f53c00000000000000000000803f000000000000803f00000000000080bfff0000ff343a953a867dc83cb014283e0000000027075c3d38534d3eee12f53c00000000000000000000803f000080bf0000000000000000000080bf000000ff0056883e0000803fb014283e0000000099d0b5bb38534d3eee12f53c00000000000000000000803f000080bf0000000000000000000080bf000000ff609ddb3e0000803fb014283e00000000999d633b8f363a3eee12f53c00000000000000000000803f000080bf0000000000000000000080bf000000ff14f0ce3ed02b683fb014283e00000000f6dd2f3dd3943d3eee12f53c00000000000000000000803f000080bf0000000000000000000080bf000000ff557c973ee35e6c3fb014283e00000000461b333da6463e3eee12f53c00000000000000000000803f000080bf0000000000000000000080bf000000ffd45f963e9b3c6d3fb014283e00000000db5f0f3d52de3e3e12d4b83cc4ef8bbd01c280be932777bf00000000cbbb773f340f81be000080bfff0000ff3b26f43ddb966d3eb014283e000000000aeea33b45833b3e0537d13ccfef8bbd04c280be912777bf00000000cbbb773f390f81be000080bfff0000ff2916e43d6096953eb014283e00000000d7b7b8ba38534d3e7ed0af3c000000000000803f000000000000000000000000000080bf000080bfff0000ff519f163e2e2b9c3eb014283e00000000d858223d38534d3e7c04983c000000000000803f000000000000000000000000000080bf000080bfff0000ff381f183ea914643eb014283e000000000aeea33b45833b3e0537d13cb8e752bf4be4cbbeb483cebedf22e13e0000000032ec65bf000080bfff0000ff866d8c3c335b353bb014283e00000000999d633b8f363a3eee12f53c00000000000000000000803f0000803f0000000000000000000080bfff0000ffb6fd013c00000000b014283e0000000099d0b5bb38534d3eee12f53c00000000000000000000803f0000803f0000000000000000000080bfff0000ff00000000b8ae263db014283e00000000d7b7b8ba38534d3e7ed0af3c000000000000803f00000000d922e13e0000000034ec65bf000080bfff0000ffc43a9a3cb8ae263db014283e00000000
+  m_CompressedMesh:
+    m_Vertices:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_UV:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Normals:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Tangents:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Weights:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_NormalSigns:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_TangentSigns:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_FloatColors:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_BoneIndices:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Triangles:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_UVInfo: 0
+  m_LocalAABB:
+    m_Center: {x: 0.024084605, y: 0.19118077, z: 0.02423654}
+    m_Extent: {x: 0.029633153, y: 0.009332009, z: 0.0056797136}
+  m_MeshUsageFlags: 0
+  m_CookingOptions: 30
+  m_BakedConvexCollisionMesh: 
+  m_BakedTriangleCollisionMesh: 
+  m_MeshMetrics[0]: 1
+  m_MeshMetrics[1]: 1
+  m_MeshOptimizationFlags: -1
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 

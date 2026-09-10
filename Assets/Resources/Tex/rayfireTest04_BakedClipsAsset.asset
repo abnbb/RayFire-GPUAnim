@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc728264d94ffb946a611ea6807ec083, type: 3}
+  m_Name: rayfireTest04_BakedClipsAsset
+  m_EditorClassIdentifier: 
+  AnimationsTexX: {fileID: 2800000, guid: 32e123d69c5c200458b7c3e9c3372982, type: 2}
+  AnimationsTexY: {fileID: 2800000, guid: a48a03e9cdc3d074e83c428ac4494bf1, type: 2}
+  AnimationsTexZ: {fileID: 2800000, guid: c1c5751c57619694e9062449810c6582, type: 2}
+  totalFrames: 100
+  AmountOfObjects: 198
+  clips:
+  - clipName: Take 001
+    startFrame: 0
+    frameRate: 30
+    frameCount: 100
