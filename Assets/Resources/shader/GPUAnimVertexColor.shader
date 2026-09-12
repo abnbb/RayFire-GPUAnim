@@ -2,6 +2,7 @@ Shader "Custom/GPUAnimVertexColor"
 {
     Properties
     {
+        _Tex("Texture", 2D) = "white" {}
         _Color1 ("Color1", Color) = (1,1,1,1)
         _Color2 ("Color2", Color) = (0,0,0,1)
         _MainTex1 ("Texture", 2D) = "white" {}
@@ -45,6 +46,7 @@ Shader "Custom/GPUAnimVertexColor"
             sampler2D _MainTex1;
             sampler2D _MainTex2;
             sampler2D _MainTex3;
+            sampler2D _Tex;
             float4 _MainTex1_ST;
             float4 _MainTex2_ST;
             float4 _MainTex3_ST;
@@ -83,7 +85,8 @@ Shader "Custom/GPUAnimVertexColor"
                 // sample the texture
                 // fixed4 col = tex2D(_MainTex, i.uv);
                 half4 col = lerp(_Color1, _Color2, i.color.r);
-                return col;
+                half4 texCol = tex2D(_Tex, i.uv);
+                return texCol*col;
             }
             ENDCG
         }

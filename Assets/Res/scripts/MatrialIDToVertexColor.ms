@@ -380,6 +380,88 @@
         update obj
     )
 
+    fn setFBXExportParamSafe paramName paramValue =
+    (
+        try
+        (
+            FBXExporterSetParam paramName paramValue
+            true
+        )
+        catch
+        (
+            format "FBX parameter unavailable: % = %\n" paramName paramValue
+            false
+        )
+    )
+
+    fn configureFBXExport bakeAnimation startFrame endFrame frameStep =
+    (
+        -- These parameters are supported by the FBX exporter shipped with Max 2022.
+        setFBXExportParamSafe "Animation" bakeAnimation
+        setFBXExportParamSafe "BakeAnimation" bakeAnimation
+        setFBXExportParamSafe "BakeFrameStart" startFrame
+        setFBXExportParamSafe "BakeFrameEnd" endFrame
+        setFBXExportParamSafe "BakeFrameStep" frameStep
+        setFBXExportParamSafe "BakeResampleAnimation" bakeAnimation
+
+        setFBXExportParamSafe "SmoothingGroups" true
+        setFBXExportParamSafe "VertexColor" true
+        setFBXExportParamSafe "Normals" true
+        setFBXExportParamSafe "Triangulate" false
+        setFBXExportParamSafe "Cameras" false
+        setFBXExportParamSafe "Lights" false
+        true
+    )
+
+    fn exportSelectedObjectsToFBX bakeAnimation startFrame endFrame frameStep =
+    (
+        if selection.count == 0 then
+        (
+            messageBox "Select the processed objects to export first." title:"FBX Export"
+            false
+        )
+        else
+        (
+            local filePath = getSaveFileName caption:"Export Selected Objects to FBX" types:"FBX (*.fbx)|*.fbx|" filename:""
+
+            if filePath == undefined then
+            (
+                false
+            )
+            else
+            (
+                if (toLower (getFilenameType filePath)) != ".fbx" do
+                    filePath += ".fbx"
+
+                configureFBXExport bakeAnimation startFrame endFrame frameStep
+
+                local exported = false
+                try
+                (
+                    exportFile filePath #noPrompt selectedOnly:true
+                    exported = true
+                )
+                catch
+                (
+                    messageBox ("FBX export failed:\n" + (getCurrentException() as string)) title:"FBX Export"
+                )
+
+                if exported then
+                (
+                    messageBox (
+                        "Export completed.\n\n" +
+                        "File: " + filePath + "\n" +
+                        "Objects: " + (selection.count as string) + "\n" +
+                        "Smoothing groups, vertex colors and normals were enabled.\n" +
+                        "Animation baking: " + (if bakeAnimation then "On" else "Off")
+                    ) title:"FBX Export"
+                )
+
+                exported
+            )
+        )
+    )
+
     fn applyInnerOuterClassification setPivot pivotPos rotatePivot axisIndex angleDeg =
     (
         local appliedCount = 0
@@ -436,8 +518,18 @@
         button btnReset "Reset Workflow" pos:[20,324] width:150 height:24
         button btnOpen "Open RayFire" pos:[190,324] width:150 height:24
 
-        label lblStatus "Status: Select source objects." pos:[12,370] width:338 height:34
-        label lblInfo "Pivot options are applied in Step 3 after confirmation." pos:[12,408] width:338 height:30
+        groupBox grpExport "FBX Export" pos:[8,366] width:344 height:126
+        checkbox chkBakeAnimation "Bake animation" pos:[20,388] checked:true
+        label lblStart "Start" pos:[20,420] width:35
+        spinner spnBakeStart pos:[54,418] width:72 type:#float range:[-1000000,1000000,animationRange.start]
+        label lblEnd "End" pos:[136,420] width:28
+        spinner spnBakeEnd pos:[166,418] width:72 type:#float range:[-1000000,1000000,animationRange.end]
+        label lblStep "Step" pos:[254,420] width:28
+        spinner spnBakeStep pos:[286,418] width:52 type:#float range:[0.001,1000,1]
+        button btnExport "4. Export Selected Objects to FBX" pos:[20,456] width:320 height:28 enabled:false
+
+        label lblStatus "Status: Select source objects." pos:[12,504] width:338 height:34
+        label lblInfo "Pivot options are applied in Step 3 after confirmation." pos:[12,544] width:338 height:42
 
         on btnPrepare pressed do
         (
@@ -455,6 +547,7 @@
 
                 btnAnalyze.enabled = true
                 btnApply.enabled = false
+                btnExport.enabled = false
 
                 local rayFireOpened = openRayFirePanel()
                 local openText = if rayFireOpened then "RayFire opened." else "RayFire could not be opened."
@@ -527,6 +620,7 @@
                     lblStatus.text = ("Status: Applied to " + (result[1] as string) + " object(s).")
                     lblInfo.text = "Outer faces are black; inner faces are red. Pivot setup was applied last."
                     btnApply.enabled = false
+                    btnExport.enabled = (result[1] > 0)
                 )
             )
         )
@@ -536,8 +630,50 @@
             clearWorkflowState()
             btnAnalyze.enabled = false
             btnApply.enabled = false
+            btnExport.enabled = false
             lblStatus.text = "Status: Select source objects."
             lblInfo.text = "Pivot options are applied in Step 3 after confirmation."
+        )
+
+        on btnExport pressed do
+        (
+            if not MatIDVC_RF_Analyzed and not MatIDVC_RF_Prepared then
+            (
+                messageBox "Complete Steps 1 to 3 before exporting." title:"FBX Export"
+            )
+            else
+            (
+                local bakeStart = spnBakeStart.value
+                local bakeEnd = spnBakeEnd.value
+                local bakeStep = spnBakeStep.value
+
+                if bakeEnd < bakeStart then
+                (
+                    messageBox "End frame must be greater than or equal to Start frame." title:"FBX Export"
+                )
+                else if bakeStep <= 0 then
+                (
+                    messageBox "Bake step must be greater than zero." title:"FBX Export"
+                )
+                else
+                (
+                    local bakeNotice = if chkBakeAnimation.checked then
+                        "\n\nMake sure the RayFire animation has already been baked."
+                    else
+                        ""
+
+                    local answer = queryBox (
+                        "Export the current selection as FBX?" + bakeNotice +
+                        "\n\nSelected objects: " + (selection.count as string)
+                    ) title:"Confirm FBX Export"
+
+                    if answer do
+                    (
+                        if exportSelectedObjectsToFBX chkBakeAnimation.checked bakeStart bakeEnd bakeStep then
+                            lblInfo.text = "FBX export completed with smoothing groups and vertex colors."
+                    )
+                )
+            )
         )
 
         on btnOpen pressed do
@@ -551,5 +687,5 @@
 
     try(destroyDialog MatIDVC_RayFire_Rollout) catch()
     clearWorkflowState()
-    createDialog MatIDVC_RayFire_Rollout 360 450
+    createDialog MatIDVC_RayFire_Rollout 360 600
 )
