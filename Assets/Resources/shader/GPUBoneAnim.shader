@@ -13,10 +13,10 @@ Shader "Custom/GPUBoneAnim"
 
         Pass
         {
-            CGPROGRAM
+            HLSLPROGRAM
 // Upgrade NOTE: excluded shader from OpenGL ES 2.0 because it uses non-square matrices
             #pragma exclude_renderers gles
-            #pragma target 3.0            
+            #pragma target 4.0            
             #pragma vertex vert
             #pragma fragment frag
             // make fog work
@@ -60,6 +60,38 @@ Shader "Custom/GPUBoneAnim"
                 M = float3x4(r1, r2, r3);
             }
 
+            void sampleAnimNormalM(in float index, out float3x3 M)
+            {
+                float2 timestep = float2(_frameState, index);
+                float3 r1 = tex2Dlod(_MainTex1, float4(timestep, 0, 0)).xyz;
+                float3 r2 = tex2Dlod(_MainTex2, float4(timestep, 0, 0)).xyz;
+                float3 r3 = tex2Dlod(_MainTex3, float4(timestep, 0, 0)).xyz;
+                M = float3x3(r1, r2, r3);
+            }
+            void InverseTranspose(in float3x3 M, out float3x3 invTransM)
+            {
+                // HLSL 中 M[0]、M[1]、M[2] 分别表示矩阵的行。
+                float3 c0 = cross(M[1], M[2]);
+                float3 c1 = cross(M[2], M[0]);
+                float3 c2 = cross(M[0], M[1]);
+
+                float det = dot(M[0], c0);
+
+                // 奇异矩阵无法求逆；回退到单位矩阵，避免除零。
+                if (abs(det) < 1e-8)
+                {
+                    invTransM = float3x3(
+                        1, 0, 0,
+                        0, 1, 0,
+                        0, 0, 1
+                    );
+                    return;
+                }
+
+                // 余子式矩阵 / 行列式，已经是逆转置，无需再 transpose。
+                invTransM = float3x3(c0, c1, c2) / det;
+            }
+
             void applyGPUAnim(in float4 vertex, in float4 boneIndices, in float4 boneWeights, out float3 worldPos)
             {
                 float3x4 M1,M2,M3,M4;
@@ -70,15 +102,18 @@ Shader "Custom/GPUBoneAnim"
                 worldPos = mul(M1, vertex)*boneWeights.x + mul(M2, vertex)*boneWeights.y + mul(M3, vertex)*boneWeights.z + mul(M4, vertex)*boneWeights.w;
             }
 
-            void applyGPUAnimNormal(in float3 normal, in float4 boneIndices, in float4 boneWeights, out float3 animNormal)
+            void applyGPUAnimNormal(in float3 n, in float4 boneIndices, in float4 boneWeights, out float3 animNormal)
             {
-                float3x4 M1,M2,M3,M4;
-                float4 n = float4(normal, 0.0);
-                sampleAnimM(boneIndices.x, M1);
-                sampleAnimM(boneIndices.y, M2);
-                sampleAnimM(boneIndices.z, M3);
-                sampleAnimM(boneIndices.w, M4);
-                animNormal = mul(M1, n)*boneWeights.x + mul(M2, n)*boneWeights.y + mul(M3, n)*boneWeights.z + mul(M4, n)*boneWeights.w;
+                float3x3 M1,M2,M3,M4,invTransM;
+                sampleAnimNormalM(boneIndices.x, M1);
+                sampleAnimNormalM(boneIndices.y, M2);
+                sampleAnimNormalM(boneIndices.z, M3);
+                sampleAnimNormalM(boneIndices.w, M4);
+
+                float3x3 BoneM = M1*boneWeights.x + M2*boneWeights.y + M3*boneWeights.z + M4*boneWeights.w;
+                InverseTranspose(BoneM, invTransM);
+
+                animNormal = mul(invTransM, n);
             }
 
             v2f vert (appdata v)
@@ -87,11 +122,11 @@ Shader "Custom/GPUBoneAnim"
                 float3 worldPos;
                 float3 animNormal;
                 applyGPUAnim(v.vertex, v.index, v.weights, worldPos);
-                applyGPUAnim(float4(v.normal,0.0), v.index, v.weights, animNormal);
+                applyGPUAnimNormal(v.normal, v.index, v.weights, animNormal);
                 // float4 objVertex = mul(MM, float4(worldPos.xyz,1));
                 //每个子物体有不同的UNITY_MATRIX_M矩阵，将原点位于0，0，0的子物体变化到正确的位置
                 o.vertex = UnityObjectToClipPos(float4(worldPos.xyz, 1.0));
-                o.worldNormal = UnityObjectToWorldNormal(animNormal);
+                o.worldNormal = animNormal;
                 o.uv = v.uv;
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
@@ -108,7 +143,7 @@ Shader "Custom/GPUBoneAnim"
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;
             }
-            ENDCG
+            ENDHLSL
         }
     }
 }
