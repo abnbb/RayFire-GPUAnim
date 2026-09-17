@@ -19,6 +19,9 @@ public class BakedClipsAsset : ScriptableObject
    public int totalFrames;
    public int AmountOfObjects;
 
+   public List<uint> AttachBoneIndices;
+   public List<string> AttachBones;
+
    public List<clipInfo> clips = new List<clipInfo>();
     
 }

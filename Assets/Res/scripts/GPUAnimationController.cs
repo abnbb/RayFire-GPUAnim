@@ -118,21 +118,25 @@ public class GPUAnimationController : MonoBehaviour
             UpdateShaderFrame(frameplay);
             return;
         }
-        
+
         if(!isplaying)
             return;
-        
 
         double elapsedTime = Time.time - playAStartTime;
         int currentFrame = (int)(elapsedTime * currentClipInfo.frameRate)+currentClipInfo.startFrame;
         currentFrame %= bakedClipsAsset.totalFrames;
-        float frameIndex = ((float)currentFrame+0.5f) / bakedClipsAsset.totalFrames;
-        Debug.Log($"Current Frame: {currentFrame}, Frame Index: {frameIndex}");
-        UpdateShaderFrame(frameIndex);
         if(currentFrame+1 >= bakedClipsAsset.totalFrames || currentFrame >= currentClipInfo.startFrame + currentClipInfo.frameCount)
         {
             isplaying = false;
         }
+
+        float frameIndex = ((float)currentFrame+0.5f) / bakedClipsAsset.totalFrames;
+        // Debug.Log($"Current Frame: {currentFrame}, Frame Index: {frameIndex}");
+        UpdateShaderFrame(frameIndex);
+
+        
+
+        
     }
 
     void UpdateShaderFrame(float frameIndex)

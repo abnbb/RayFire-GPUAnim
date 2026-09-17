@@ -31,7 +31,7 @@ public class GPUAnimationControllerEditor : Editor
             EditorGUILayout.HelpBox("Enter Play Mode to use the playback buttons.", MessageType.Info);
         }
 
-        EditorGUI.BeginDisabledGroup(!Application.isPlaying);
+        // EditorGUI.BeginDisabledGroup(false);
         for (int i = 0; i < bakedClipsAsset.clips.Count; i++)
         {
             BakedClipsAsset.clipInfo clipInfo = bakedClipsAsset.clips[i];
@@ -48,6 +48,6 @@ public class GPUAnimationControllerEditor : Editor
         {
             controller.StopAnimation();
         }
-        EditorGUI.EndDisabledGroup();
+        // EditorGUI.EndDisabledGroup();
     }
 }
