@@ -3,6 +3,7 @@ using System.Collections.Generic;
 // using System.ComponentModel.DataAnnotations;
 using UnityEngine;
 
+[ExecuteAlways]
 public class GPUBoneAnimationController : MonoBehaviour
 {
     public BakedClipsAsset bakedClipsAsset;
@@ -19,8 +20,12 @@ public class GPUBoneAnimationController : MonoBehaviour
     // Start is called before the first frame update
     void OnEnable()
     {
+        animationTexturesAssigned = false;
         renderers = GetComponentsInChildren<Renderer>(true);
         propertyBlock = new MaterialPropertyBlock();
+
+        if (!Application.IsPlaying(gameObject) && !playByHand)
+            return;
 
         if (renderers == null || renderers.Length == 0)
         {
@@ -55,12 +60,10 @@ public class GPUBoneAnimationController : MonoBehaviour
                 Debug.LogError("BakedClipsAsset is not properly configured.");
                 return false;
             }
-            int count = 0;
+            long count = 0;
             foreach (var clip in bakedClipsAsset.clips)
             {
-                if (clip.frameCount <= 0 || clip.frameRate <= 0f
-                    || clip.startFrame < 0
-                    || clip.startFrame + clip.frameCount > bakedClipsAsset.totalFrames)
+                if (!IsValidClip(clip))
                 {
                     Debug.LogError("BakedClipsAsset contains an invalid clip range.");
                     return false;
@@ -97,8 +100,17 @@ public class GPUBoneAnimationController : MonoBehaviour
 
     public void RenderGPUAnimation(int clipIndex)
     {
-        if (!CheckPlayable() || clipIndex < 0 || clipIndex >= bakedClipsAsset.clips.Count)
+        if (!Application.IsPlaying(gameObject))
             return;
+
+        if (!CheckPlayable())
+            return;
+
+        if (clipIndex < 0 || clipIndex >= bakedClipsAsset.clips.Count)
+        {
+            Debug.LogWarning($"Animation clip index is out of range: {clipIndex}.", this);
+            return;
+        }
 
         animationTexturesAssigned = ApplyAnimationTextures();
         if (!animationTexturesAssigned)
@@ -119,8 +131,16 @@ public class GPUBoneAnimationController : MonoBehaviour
     {
         if (playByHand)
         {
-            if (bakedClipsAsset == null || bakedClipsAsset.totalFrames <= 0)
+            if (!HasAnimationTextures() || bakedClipsAsset.totalFrames <= 0
+                || float.IsNaN(frameplay) || float.IsInfinity(frameplay)
+                || frameplay < 0f || frameplay > 1f)
                 return;
+
+            if (!Application.IsPlaying(gameObject))
+            {
+                renderers = GetComponentsInChildren<Renderer>(true);
+                animationTexturesAssigned = false;
+            }
 
             if (!animationTexturesAssigned)
             {
@@ -136,11 +156,19 @@ public class GPUBoneAnimationController : MonoBehaviour
             return;
         }
         
-        if(!isplaying)
+        if (!Application.IsPlaying(gameObject) || !isplaying)
+            return;
+
+        if (!HasAnimationTextures() || !IsValidClip(currentClipInfo))
             return;
         
 
         double elapsedTime = Time.time - playAStartTime;
+        double frameProgress = elapsedTime * currentClipInfo.frameRate;
+        if (double.IsNaN(frameProgress) || double.IsInfinity(frameProgress)
+            || frameProgress < 0d || frameProgress > int.MaxValue)
+            return;
+
         int clipFrame = (int)(elapsedTime * currentClipInfo.frameRate);
         if (clipFrame >= currentClipInfo.frameCount)
         {
@@ -152,11 +180,19 @@ public class GPUBoneAnimationController : MonoBehaviour
         float frameIndex = ToTextureFrameCoordinate(currentFrame);
         Debug.Log($"Current Frame: {currentFrame}, Frame Index: {frameIndex}");
         UpdateShaderFrame(frameIndex);
+        UpdateAttachObject();
+    }
+
+    void UpdateAttachObject()
+    {
+        //Debug.Log($"worldTransM\n{this.transform.localToWorldMatrix}");
     }
 
     void UpdateShaderFrame(float frameIndex)
     {
-        if (renderers == null || renderers.Length == 0)
+        if (renderers == null || renderers.Length == 0
+            || float.IsNaN(frameIndex) || float.IsInfinity(frameIndex)
+            || frameIndex < 0f || frameIndex > 1f)
             return;
 
         if (propertyBlock == null)
@@ -177,7 +213,7 @@ public class GPUBoneAnimationController : MonoBehaviour
 
     private bool ApplyAnimationTextures()
     {
-        if (bakedClipsAsset == null || renderers == null || renderers.Length == 0)
+        if (!HasAnimationTextures() || renderers == null || renderers.Length == 0)
             return false;
 
         if (propertyBlock == null)
@@ -185,6 +221,7 @@ public class GPUBoneAnimationController : MonoBehaviour
             propertyBlock = new MaterialPropertyBlock();
         }
 
+        bool texturesApplied = false;
         foreach (Renderer renderer in renderers)
         {
             if (renderer == null)
@@ -195,9 +232,27 @@ public class GPUBoneAnimationController : MonoBehaviour
             propertyBlock.SetTexture("_MainTex2", bakedClipsAsset.AnimationsTexY);
             propertyBlock.SetTexture("_MainTex3", bakedClipsAsset.AnimationsTexZ);
             renderer.SetPropertyBlock(propertyBlock);
+            texturesApplied = true;
         }
 
-        return true;
+        return texturesApplied;
+    }
+
+    private bool HasAnimationTextures()
+    {
+        return bakedClipsAsset != null
+            && bakedClipsAsset.AnimationsTexX != null
+            && bakedClipsAsset.AnimationsTexY != null
+            && bakedClipsAsset.AnimationsTexZ != null;
+    }
+
+    private bool IsValidClip(BakedClipsAsset.clipInfo clip)
+    {
+        return bakedClipsAsset != null && bakedClipsAsset.totalFrames > 0
+            && clip.frameCount > 0 && clip.frameRate > 0f
+            && !float.IsNaN(clip.frameRate) && !float.IsInfinity(clip.frameRate)
+            && clip.startFrame >= 0
+            && (long)clip.startFrame + clip.frameCount <= bakedClipsAsset.totalFrames;
     }
 
     private float ToTextureFrameCoordinate(int frame)

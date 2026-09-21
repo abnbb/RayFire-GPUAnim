@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+// using StreamHelper;
 
 public static class FBXWithBoneClipInfo
 {
@@ -13,6 +14,8 @@ public static class FBXWithBoneClipInfo
     private const string MaterialFolder = "Assets/Res/materials";
     private const string MeshFolder = "Assets/Resources/meshes";
     private const string ShaderName = "Custom/GPUBoneAnim";
+    private const string AttachBoneLogPrefix = "[挂点烘焙]";
+    private const int AttachBoneTRSStride = sizeof(float) * 8;
     // private List<string> attachBones = new List<string>();
     private struct ClipInfo
     {
@@ -39,7 +42,14 @@ public static class FBXWithBoneClipInfo
         public List<ObjInfo> boneInfos;
         public int totalBoneCount;
         public List<string> attachBones;
-        public List<float> attachBoneIndices;
+        public List<BoneTRS> attachBoneTRS;
+    }
+
+    private struct BoneTRS
+    {
+        public Vector3 position;
+        public Quaternion rotation;
+        public Vector3 scale;
     }
 
     [MenuItem(MenuPath)]
@@ -100,47 +110,71 @@ public static class FBXWithBoneClipInfo
             Debug.LogWarning("No valid AnimationClips were found in the selected asset.");
             return;
         }
-        EnsureProjectFolders();
-        //Root.WorlToLocalMatrix == I
-        GameObject instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
-        instance.name = sourceObject.name + "_BakeInstance";
-        instance.transform.localScale = Vector3.one;
-
-
-        BonesManager bonesManager = new BonesManager();
-        bonesManager.boneInfos = new List<ObjInfo>();
-        // ===== 赋值弹窗输入的挂点名字，原有逻辑完全不变 =====
-        bonesManager.attachBones = attachBoneInputNames ?? new List<string>();
-        bonesManager.attachBoneIndices = new List<float>();
-        bonesManager.totalBoneCount = 0;
-        CollectBonesAndInfos(instance, ref bonesManager);
-        CollectAttachBones(instance.transform, ref bonesManager);
-        if (bonesManager.totalBoneCount <= 0)
+        GameObject instance = null;
+        Texture2D gpuTexX = null;
+        Texture2D gpuTexY = null;
+        Texture2D gpuTexZ = null;
+        BakedClipsAsset bakedClipsAsset = null;
+        try
         {
-            Debug.LogWarning("No animated bone objects were found in the selected asset.");
-            UnityEngine.Object.DestroyImmediate(instance);
-            return;
+            SkinnedMeshRenderer[] sourceRenderers = sourceObject.GetComponentsInChildren<SkinnedMeshRenderer>();
+            foreach (SkinnedMeshRenderer sourceRenderer in sourceRenderers)
+            {
+                if (sourceRenderer.sharedMesh == null)
+                    throw new InvalidOperationException($"源模型包含空网格：{sourceRenderer.name}");
+            }
+            if (Shader.Find(ShaderName) == null)
+                throw new InvalidOperationException($"Shader was not found: {ShaderName}");
+
+            string assetName = sourceObject.name + "_BakeInstance";
+            GPUBoneBakeAssetStore assetStore = new GPUBoneBakeAssetStore(assetPath, name, assetName,
+                PrefabFolder, MaterialFolder, MeshFolder, TextureFolder, sourceRenderers.Length);
+            instance = UnityEngine.Object.Instantiate(sourceObject, Vector3.zero, Quaternion.identity);
+            instance.name = assetName;
+            instance.transform.localScale = Vector3.one;
+
+            BonesManager bonesManager = new BonesManager();
+            bonesManager.boneInfos = new List<ObjInfo>();
+            bonesManager.attachBones = attachBoneInputNames ?? new List<string>();
+            bonesManager.attachBoneTRS = new List<BoneTRS>();
+            bonesManager.totalBoneCount = 0;
+            CollectBonesAndInfos(instance, ref bonesManager);
+            CollectAttachBones(instance.transform, ref bonesManager);
+            bool attachBoneDataValid = LogAttachBoneCollection(instance.transform, bonesManager);
+            if (bonesManager.totalBoneCount <= 0)
+            {
+                Debug.LogWarning("No animated bone objects were found in the selected asset.");
+                return;
+            }
+
+            attachBoneDataValid &= BakeClipMatrices(instance, animManager, ref bonesManager, out gpuTexX, out gpuTexY, out gpuTexZ);
+            assetStore.Prepare();
+            gpuTexX = assetStore.Save(gpuTexX, assetStore.TexturePath("X"));
+            gpuTexY = assetStore.Save(gpuTexY, assetStore.TexturePath("Y"));
+            gpuTexZ = assetStore.Save(gpuTexZ, assetStore.TexturePath("Z"));
+
+            bakedClipsAsset = CreateBakedClipsAsset(animManager, bonesManager, gpuTexX, gpuTexY, gpuTexZ);
+            bakedClipsAsset = assetStore.Save(bakedClipsAsset, assetStore.ClipsPath);
+            GenerateGPUAnimationPrefab(instance, bakedClipsAsset, bonesManager, assetStore);
+            AssetDatabase.SaveAssets();
+            assetStore.DeleteUnusedOutputs();
+            AssetDatabase.Refresh();
+            LogSavedAttachBoneData(bakedClipsAsset, assetStore.ClipsPath, bonesManager, animManager.totalFrameCount, attachBoneDataValid);
+            Debug.Log("GPU animation bake finished: " + assetName);
         }
-        Texture2D gpuTexX;
-        Texture2D gpuTexY;
-        Texture2D gpuTexZ;
-        List<float> attachBoneIndices = new List<float>();
-        BakeClipMatrices(instance, animManager, ref bonesManager, out gpuTexX, out gpuTexY, out gpuTexZ);
-        string assetName = instance.name;
-        SaveTextureAsset(gpuTexX, TextureFolder + "/" + assetName + "_GPUTexX.asset");
-        SaveTextureAsset(gpuTexY, TextureFolder + "/" + assetName + "_GPUTexY.asset");
-        SaveTextureAsset(gpuTexZ, TextureFolder + "/" + assetName + "_GPUTexZ.asset");
-
-        BakedClipsAsset bakedClipsAsset = CreateBakedClipsAsset(animManager, bonesManager, gpuTexX, gpuTexY, gpuTexZ);
-        SaveBakedClipsAsset(bakedClipsAsset, TextureFolder + "/" + assetName + "_BakedClipsAsset.asset");
-
-        GenerateGPUAnimationPrefab(instance, bakedClipsAsset, bonesManager, PrefabFolder + "/" + assetName + ".prefab");
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        Debug.Log("GPU animation bake finished: " + assetName);
-
-        UnityEngine.Object.DestroyImmediate(instance);
-
+        catch (Exception exception)
+        {
+            Debug.LogError($"[骨骼烘焙资产] 烘焙未完成：{exception.Message}。请检查冲突或写入错误后重试。");
+        }
+        finally
+        {
+            if (instance != null)
+                UnityEngine.Object.DestroyImmediate(instance);
+            DestroyTemporaryAsset(gpuTexX);
+            DestroyTemporaryAsset(gpuTexY);
+            DestroyTemporaryAsset(gpuTexZ);
+            DestroyTemporaryAsset(bakedClipsAsset);
+        }
     }
 
 
@@ -155,31 +189,32 @@ public static class FBXWithBoneClipInfo
         string assetPath = AssetDatabase.GetAssetPath(selectedAsset);
         return !string.IsNullOrEmpty(assetPath);
     }
-    private static void ProcessMesh(GameObject instance, BonesManager boneManager, GameObject GameRoot)
+    private static void ProcessMesh(GameObject instance, BonesManager boneManager, GameObject GameRoot, GPUBoneBakeAssetStore assetStore)
     {
         if (boneManager.totalBoneCount == 0)
         {
             return;
         }
-        string assetName = instance.name;
-
-        int i = 0;
-        foreach (var SKedMR in instance.GetComponentsInChildren<SkinnedMeshRenderer>())
+        SkinnedMeshRenderer[] sourceRenderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>();
+        for (int meshIndex = 0; meshIndex < sourceRenderers.Length; meshIndex++)
         {
-            GameObject GameChild = new GameObject(assetName + "_" + i++);
+            SkinnedMeshRenderer SKedMR = sourceRenderers[meshIndex];
             Mesh mesh = UnityEngine.Object.Instantiate(SKedMR.sharedMesh);
-            mesh.name = assetName + "_GPUABonenimMesh_" + i;
+            mesh.name = assetStore.MeshName(meshIndex);
             TranlateMeshSpace(SKedMR.transform.localToWorldMatrix, mesh);
 
             SaveBoneWeights(mesh, boneManager.totalBoneCount);
 
-            SKedMR.sharedMesh = mesh;
-            EnsureFolder(MeshFolder, assetName);
-            SaveMeshAsset(mesh, MeshFolder + "/" + assetName + "/" + mesh.name + ".asset");
-            GameChild.transform.SetParent(GameRoot.transform, false);
-            GameChild.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var targetRenderer = GameChild.AddComponent<MeshRenderer>();
-            AssignGPUAnimationMaterial(targetRenderer, instance.name);
+            mesh = assetStore.Save(mesh, assetStore.MeshPath(meshIndex));
+            GameObject meshObject = GameRoot;
+            if (sourceRenderers.Length > 1)
+            {
+                meshObject = new GameObject(SKedMR.name + "_" + meshIndex);
+                meshObject.transform.SetParent(GameRoot.transform, false);
+            }
+            meshObject.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var targetRenderer = meshObject.AddComponent<MeshRenderer>();
+            AssignGPUAnimationMaterial(targetRenderer, assetStore);
         }
     }
     private static void SaveBoneWeights(Mesh mesh, int BonesCount)
@@ -294,6 +329,90 @@ public static class FBXWithBoneClipInfo
             
         }
     }
+    private static bool LogAttachBoneCollection(Transform root, BonesManager bonesManager)
+    {
+        if (bonesManager.attachBones.Count == 0)
+        {
+            Debug.Log($"{AttachBoneLogPrefix} 未指定挂点，本次不保存挂点动画数据。");
+            return true;
+        }
+
+        Debug.Log($"{AttachBoneLogPrefix} 请求 {bonesManager.attachBones.Count} 个挂点：{string.Join(", ", bonesManager.attachBones)}。数据按实际采集顺序、动画片段、帧排列；每条 {AttachBoneTRSStride} 字节（position.xyz + rotation.xyzw + scale.x）。");
+        bool valid = true;
+        List<string> collectedNames = new List<string>();
+        foreach (ObjInfo boneInfo in bonesManager.boneInfos)
+        {
+            if (boneInfo.AttachBoneIndex < 0)
+            {
+                continue;
+            }
+
+            string hierarchyPath = AnimationUtility.CalculateTransformPath(boneInfo.ObjTrans, root);
+            Debug.Log($"{AttachBoneLogPrefix} 匹配挂点：{boneInfo.BoneName}，路径：{hierarchyPath}，数据块索引：{collectedNames.Count}，骨骼索引：{boneInfo.AttachBoneIndex}。");
+            collectedNames.Add(boneInfo.BoneName);
+        }
+
+        HashSet<string> requestedNames = new HashSet<string>();
+        foreach (string boneName in bonesManager.attachBones)
+        {
+            if (!requestedNames.Add(boneName))
+            {
+                Debug.LogWarning($"{AttachBoneLogPrefix} 重复输入挂点名：{boneName}，名称列表可能与数据块数量不一致。");
+                valid = false;
+                continue;
+            }
+
+            int matchCount = collectedNames.FindAll(collectedName => collectedName == boneName).Count;
+            if (matchCount != 1)
+            {
+                Debug.LogWarning($"{AttachBoneLogPrefix} 挂点 {boneName} 匹配到 {matchCount} 个对象，预期 1 个。请检查名称、大小写或层级中的同名对象；当前采集不包含模型根节点。");
+                valid = false;
+            }
+        }
+
+        bool orderMatches = collectedNames.Count == bonesManager.attachBones.Count;
+        for (int boneIndex = 0; orderMatches && boneIndex < collectedNames.Count; boneIndex++)
+        {
+            orderMatches = collectedNames[boneIndex] == bonesManager.attachBones[boneIndex];
+        }
+        if (!orderMatches)
+        {
+            Debug.LogWarning($"{AttachBoneLogPrefix} 实际数据顺序 [{string.Join(", ", collectedNames)}] 与保存的 AttachBones 列表 [{string.Join(", ", bonesManager.attachBones)}] 不一致，按名称列表索引读取可能错位。");
+            valid = false;
+        }
+        return valid;
+    }
+
+    private static void LogSavedAttachBoneData(BakedClipsAsset bakedClipsAsset, string path, BonesManager bonesManager, int totalFrames, bool dataValid)
+    {
+        BakedClipsAsset savedAsset = AssetDatabase.LoadAssetAtPath<BakedClipsAsset>(path);
+        if (savedAsset == null || savedAsset != bakedClipsAsset || !File.Exists(path))
+        {
+            Debug.LogError($"{AttachBoneLogPrefix} 保存校验失败：无法在目标路径确认烘焙资源。路径：{path}");
+            return;
+        }
+
+        long expectedRecords = (long)bonesManager.attachBones.Count * totalFrames;
+        long expectedBytes = expectedRecords * AttachBoneTRSStride;
+        int actualRecords = bonesManager.attachBoneTRS.Count;
+        int actualBytes = savedAsset.AttachBoneTRSData == null ? 0 : savedAsset.AttachBoneTRSData.Length;
+        if (actualRecords != expectedRecords || actualBytes != expectedBytes)
+        {
+            Debug.LogError($"{AttachBoneLogPrefix} 数据数量校验失败：TRS 实际/预期 = {actualRecords}/{expectedRecords}，字节实际/预期 = {actualBytes}/{expectedBytes}。路径：{path}", savedAsset);
+            dataValid = false;
+        }
+
+        string summary = $"挂点数：{bonesManager.attachBones.Count}，每挂点预期帧数：{totalFrames}，TRS 条数：{actualRecords}，数据大小：{actualBytes} 字节，路径：{path}";
+        if (dataValid)
+        {
+            Debug.Log($"{AttachBoneLogPrefix} 资源已保存，挂点映射、采样数量和字节数校验通过。{summary}", savedAsset);
+        }
+        else
+        {
+            Debug.LogWarning($"{AttachBoneLogPrefix} 资源已保存，但挂点数据存在异常，请检查前面的日志。{summary}", savedAsset);
+        }
+    }
+
     private static void LoadClipInfos(string assetPath, ref AnimManager animManager)
     {
         // List<ClipInfo> clipInfos = new List<ClipInfo>();
@@ -319,7 +438,7 @@ public static class FBXWithBoneClipInfo
             });
         }
     }
-    private static void BakeClipMatrices(
+    private static bool BakeClipMatrices(
         GameObject instance,
         AnimManager animManager,
         ref BonesManager bonesManager,
@@ -336,15 +455,23 @@ public static class FBXWithBoneClipInfo
 
         // List<Transform> ObjTrans = new List<Transform>();
 
+        bool attachBoneDataValid = true;
         var boneInfos = bonesManager.boneInfos;
         int c = 0;
         for (int i = 0; i < bonesManager.totalBoneCount; i++)
         {
             int frameIndex = 0;
+            int firstRecordIndex = bonesManager.attachBoneTRS.Count;
+            int nonUniformScaleFrames = 0;
             foreach (ClipInfo clipInfo in animManager.clipInfos)
             {
                 if (clipInfo.clip == null || clipInfo.frameRate <= 0f)
                 {
+                    if (boneInfos[i].AttachBoneIndex >= 0)
+                    {
+                        Debug.LogWarning($"{AttachBoneLogPrefix} 挂点 {boneInfos[i].BoneName} 跳过无效片段 {clipInfo.clipName}：动画为空或帧率无效。");
+                        attachBoneDataValid = false;
+                    }
                     continue;
                 }
                 float frameDeltaTime = 1f / clipInfo.frameRate;
@@ -361,10 +488,49 @@ public static class FBXWithBoneClipInfo
                     texX[index] = matrix.GetRow(0);
                     texY[index] = matrix.GetRow(1);
                     texZ[index] = matrix.GetRow(2);
+
+                    if(boneInfos[i].AttachBoneIndex >= 0)
+                    {
+                        // Store the TRS of the attach bone at this frame
+                        BoneTRS trs;
+                        trs.position = boneInfos[i].ObjTrans.position;
+                        trs.rotation = boneInfos[i].ObjTrans.rotation;
+                        trs.scale = boneInfos[i].ObjTrans.localScale;
+                        bonesManager.attachBoneTRS.Add(trs);
+                        if (!Mathf.Approximately(trs.scale.x, trs.scale.y) || !Mathf.Approximately(trs.scale.x, trs.scale.z))
+                        {
+                            nonUniformScaleFrames++;
+                        }
+                    }
+
                     frameIndex++;
                     writtenFrameCount++;
-                    
                 }
+                if (boneInfos[i].AttachBoneIndex >= 0)
+                {
+                    string sampleSummary = $"{AttachBoneLogPrefix} 挂点 {boneInfos[i].BoneName}，片段 {clipInfo.clipName}，采样帧数实际/预期：{writtenFrameCount}/{clipInfo.frameCount}。";
+                    if (writtenFrameCount == clipInfo.frameCount)
+                    {
+                        Debug.Log(sampleSummary);
+                    }
+                    else
+                    {
+                        Debug.LogError(sampleSummary);
+                        attachBoneDataValid = false;
+                    }
+                }
+            }
+            int recordCount = bonesManager.attachBoneTRS.Count - firstRecordIndex;
+            if (recordCount > 0)
+            {
+                BoneTRS firstTRS = bonesManager.attachBoneTRS[firstRecordIndex];
+                BoneTRS lastTRS = bonesManager.attachBoneTRS[bonesManager.attachBoneTRS.Count - 1];
+                Debug.Log($"{AttachBoneLogPrefix} 挂点 {boneInfos[i].BoneName} 共 {recordCount} 条 TRS，起始字节偏移：{(long)firstRecordIndex * AttachBoneTRSStride}。首帧 T={firstTRS.position.ToString("F4")} R={firstTRS.rotation.ToString("F4")} S={firstTRS.scale.ToString("F4")}；末帧 T={lastTRS.position.ToString("F4")} R={lastTRS.rotation.ToString("F4")} S={lastTRS.scale.ToString("F4")}。T/R 为世界空间，S 为局部空间，实际仅保存 S.x。");
+            }
+            if (nonUniformScaleFrames > 0)
+            {
+                Debug.LogWarning($"{AttachBoneLogPrefix} 挂点 {boneInfos[i].BoneName} 有 {nonUniformScaleFrames} 帧非均匀缩放，当前仅保存 scale.x，无法完整还原 scale.y/z。");
+                attachBoneDataValid = false;
             }
         }
         gpuTexX.SetPixels(texX);
@@ -373,6 +539,7 @@ public static class FBXWithBoneClipInfo
         gpuTexX.Apply();
         gpuTexY.Apply();
         gpuTexZ.Apply();
+        return attachBoneDataValid;
     }
     private static BakedClipsAsset CreateBakedClipsAsset(
         AnimManager animManager,
@@ -389,15 +556,27 @@ public static class FBXWithBoneClipInfo
         bakedClipsAsset.AmountOfObjects = bonesManager.totalBoneCount;
         
         bakedClipsAsset.AttachBones = bonesManager.attachBones;
-        List<uint> attachBoneIndices = new List<uint>();
-        foreach (var boneInfo in bonesManager.boneInfos)
+
+        // List<uint> attachBoneIndices = new List<uint>();
+        // foreach (var boneInfo in bonesManager.boneInfos)
+        // {
+        //   if(boneInfo.AttachBoneIndex >= 0)
+        //   {
+        //     attachBoneIndices.Add((uint)boneInfo.AttachBoneIndex);
+        //   }
+        // }
+        // bakedClipsAsset.AttachBoneIndices = attachBoneIndices;
+
+        var streamHelper = new StreamHelper();
+        for(int i= 0;i< bonesManager.attachBoneTRS.Count; i++)
         {
-          if(boneInfo.AttachBoneIndex >= 0)
-          {
-            attachBoneIndices.Add((uint)boneInfo.AttachBoneIndex);
-          }
+            streamHelper.writeFloat3(bonesManager.attachBoneTRS[i].position);
+            streamHelper.writeWriteQuaternion(bonesManager.attachBoneTRS[i].rotation);
+            streamHelper.writeFloat(bonesManager.attachBoneTRS[i].scale.x);
         }
-        bakedClipsAsset.AttachBoneIndices = attachBoneIndices;
+        streamHelper.Capacity = (int)streamHelper.Length;
+        bakedClipsAsset.AttachBoneTRSData = streamHelper.GetBuffer();
+
         foreach (ClipInfo clipInfo in animManager.clipInfos)
         {
             bakedClipsAsset.clips.Add(new BakedClipsAsset.clipInfo
@@ -410,27 +589,29 @@ public static class FBXWithBoneClipInfo
         }
         return bakedClipsAsset;
     }
-    private static void GenerateGPUAnimationPrefab(GameObject instance, BakedClipsAsset bakedClipsAsset, BonesManager bonesManager, string prefabPath)
+    private static void GenerateGPUAnimationPrefab(GameObject instance, BakedClipsAsset bakedClipsAsset, BonesManager bonesManager, GPUBoneBakeAssetStore assetStore)
     {
         GameObject GameRoot = new GameObject(instance.name);
-        foreach (var bonesName in bonesManager.attachBones)
+        GameRoot.SetActive(false);
+        try
         {
-            GameObject attachBone = new GameObject(bonesName);
-            attachBone.transform.SetParent(GameRoot.transform, false);
+            foreach (var bonesName in bonesManager.attachBones)
+            {
+                GameObject attachBone = new GameObject(bonesName);
+                attachBone.transform.SetParent(GameRoot.transform, false);
+            }
+            ProcessMesh(instance, bonesManager, GameRoot, assetStore);
+            GPUBoneAnimationController controller = GameRoot.AddComponent<GPUBoneAnimationController>();
+            controller.bakedClipsAsset = bakedClipsAsset;
+            GameRoot.SetActive(true);
+            assetStore.SavePrefab(GameRoot);
         }
-        ProcessMesh(instance, bonesManager, GameRoot);
-        GPUBoneAnimationController controller = GameRoot.GetComponent<GPUBoneAnimationController>();
-        if (controller == null)
+        finally
         {
-            controller = GameRoot.AddComponent<GPUBoneAnimationController>();
+            UnityEngine.Object.DestroyImmediate(GameRoot);
         }
-        controller.bakedClipsAsset = bakedClipsAsset;
-        DeleteAssetIfExists(prefabPath);
-        PrefabUtility.SaveAsPrefabAsset(GameRoot, prefabPath);
-        // UnityEngine.Object.DestroyImmediate(instance);
-        UnityEngine.Object.DestroyImmediate(GameRoot);
     }
-    private static void AssignGPUAnimationMaterial(Renderer targetRenderer, string assetName)
+    private static void AssignGPUAnimationMaterial(Renderer targetRenderer, GPUBoneBakeAssetStore assetStore)
     {
         Shader shader = Shader.Find(ShaderName);
         if (shader == null)
@@ -438,19 +619,7 @@ public static class FBXWithBoneClipInfo
             Debug.LogWarning("Shader was not found: " + ShaderName);
             return;
         }
-        string materialName = assetName + "_GPUBoneAnim";
-        string materialPath = MaterialFolder + "/" + materialName + ".mat";
-        Material existingMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-        if (existingMaterial != null)
-        {
-            targetRenderer.sharedMaterial = existingMaterial;
-            return;
-        }
-        Material material = new Material(shader);
-        material.name = materialName;
-        DeleteAssetIfExists(materialPath);
-        AssetDatabase.CreateAsset(material, materialPath);
-        targetRenderer.sharedMaterial = material;
+        targetRenderer.sharedMaterial = assetStore.GetOrCreateMaterial(shader);
     }
     private static Renderer FindPlayableRenderer(GameObject instance)
     {
@@ -472,27 +641,10 @@ public static class FBXWithBoneClipInfo
         texture.wrapMode = TextureWrapMode.Clamp;
         return texture;
     }
-    private static void SaveTextureAsset(Texture2D texture, string path)
+    private static void DestroyTemporaryAsset(UnityEngine.Object asset)
     {
-        DeleteAssetIfExists(path);
-        AssetDatabase.CreateAsset(texture, path);
-    }
-    private static void SaveBakedClipsAsset(BakedClipsAsset bakedClipsAsset, string path)
-    {
-        DeleteAssetIfExists(path);
-        AssetDatabase.CreateAsset(bakedClipsAsset, path);
-    }
-    private static void SaveMeshAsset(Mesh mesh, string path)
-    {
-        DeleteAssetIfExists(path);
-        AssetDatabase.CreateAsset(mesh, path);
-    }
-    private static void DeleteAssetIfExists(string path)
-    {
-        if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null)
-        {
-            AssetDatabase.DeleteAsset(path);
-        }
+        if (asset != null && !AssetDatabase.Contains(asset))
+            UnityEngine.Object.DestroyImmediate(asset);
     }
     private static int GetTotalFrameCount(List<ClipInfo> clipInfos)
     {
@@ -515,23 +667,6 @@ public static class FBXWithBoneClipInfo
             offset += clipInfo.frameCount;
         }
         return offset;
-    }
-    private static void EnsureProjectFolders()
-    {
-        EnsureFolder("Assets", "Resources");
-        EnsureFolder("Assets/Resources", "Tex");
-        EnsureFolder("Assets", "Res");
-        EnsureFolder("Assets/Res", "prefab");
-        EnsureFolder("Assets/Res", "materials");
-        EnsureFolder("Assets/Resources", "meshes");
-    }
-    private static void EnsureFolder(string parentFolder, string folderName)
-    {
-        string folderPath = parentFolder + "/" + folderName;
-        if (!AssetDatabase.IsValidFolder(folderPath))
-        {
-            AssetDatabase.CreateFolder(parentFolder, folderName);
-        }
     }
     private static bool IsPreviewClip(AnimationClip clip)
     {

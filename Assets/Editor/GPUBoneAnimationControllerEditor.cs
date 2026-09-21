@@ -6,10 +6,17 @@ public class GPUBoneAnimationControllerEditor : Editor
 {
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        bool settingsChanged = DrawDefaultInspector();
 
         GPUBoneAnimationController controller = (GPUBoneAnimationController)target;
         BakedClipsAsset bakedClipsAsset = controller.bakedClipsAsset;
+        bool isPlaying = Application.IsPlaying(controller.gameObject);
+
+        if (settingsChanged && !isPlaying)
+        {
+            EditorApplication.QueuePlayerLoopUpdate();
+            SceneView.RepaintAll();
+        }
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("GPU Bone Animation Controls", EditorStyles.boldLabel);
@@ -26,9 +33,11 @@ public class GPUBoneAnimationControllerEditor : Editor
             return;
         }
 
-        if (!Application.isPlaying)
+        if (!isPlaying)
         {
-            EditorGUILayout.HelpBox("Enter Play Mode to use the playback buttons.", MessageType.Info);
+            EditorGUILayout.HelpBox(
+                "编辑模式：勾选 Play By Hand，拖动 Frameplay 即可预览烘焙动画。自动播放按钮仅在运行模式可用。",
+                MessageType.Info);
         }
         else if (controller.playByHand)
         {
@@ -43,7 +52,7 @@ public class GPUBoneAnimationControllerEditor : Editor
                 MessageType.Info);
         }
 
-        EditorGUI.BeginDisabledGroup(!Application.isPlaying);
+        EditorGUI.BeginDisabledGroup(!isPlaying);
 
         for (int i = 0; i < bakedClipsAsset.clips.Count; i++)
         {
