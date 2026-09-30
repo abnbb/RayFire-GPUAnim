@@ -140,6 +140,7 @@ public static class FBXWithBoneClipInfo
             bonesManager.totalBoneCount = 0;
             CollectBonesAndInfos(instance, ref bonesManager);
             CollectAttachBones(instance.transform, ref bonesManager);
+            bonesManager.attachBones = new List<string>();
             bool attachBoneDataValid = LogAttachBoneCollection(instance.transform, bonesManager);
             if (bonesManager.totalBoneCount <= 0)
             {
@@ -326,7 +327,6 @@ public static class FBXWithBoneClipInfo
                 // Debug.Log($"Collected attach bone: {child.name}");
                 bonesManager.totalBoneCount++;
             }
-            
         }
     }
     private static bool LogAttachBoneCollection(Transform root, BonesManager bonesManager)
@@ -501,6 +501,7 @@ public static class FBXWithBoneClipInfo
                         {
                             nonUniformScaleFrames++;
                         }
+                        bonesManager.attachBones.Add(boneInfos[i].BoneName);
                     }
 
                     frameIndex++;
@@ -571,8 +572,9 @@ public static class FBXWithBoneClipInfo
         for(int i= 0;i< bonesManager.attachBoneTRS.Count; i++)
         {
             streamHelper.writeFloat3(bonesManager.attachBoneTRS[i].position);
-            streamHelper.writeWriteQuaternion(bonesManager.attachBoneTRS[i].rotation);
             streamHelper.writeFloat(bonesManager.attachBoneTRS[i].scale.x);
+            streamHelper.writeWriteQuaternion(bonesManager.attachBoneTRS[i].rotation);
+            
         }
         streamHelper.Capacity = (int)streamHelper.Length;
         bakedClipsAsset.AttachBoneTRSData = streamHelper.GetBuffer();

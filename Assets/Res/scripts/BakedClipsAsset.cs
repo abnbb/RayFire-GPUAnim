@@ -19,7 +19,7 @@ public class BakedClipsAsset : ScriptableObject
    public int totalFrames;
    public int AmountOfObjects;
 
-//    [HideInInspector]
+   [HideInInspector]
    public byte[] AttachBoneTRSData;
    public List<string> AttachBones;
 

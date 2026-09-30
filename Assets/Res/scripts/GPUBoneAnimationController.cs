@@ -1,7 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
-// using System.ComponentModel.DataAnnotations;
 using UnityEngine;
+using System;
+using System.Runtime.InteropServices;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 
 [ExecuteAlways]
 public class GPUBoneAnimationController : MonoBehaviour
@@ -16,6 +20,9 @@ public class GPUBoneAnimationController : MonoBehaviour
     private BakedClipsAsset.clipInfo currentClipInfo;
     private MaterialPropertyBlock propertyBlock;
     private bool animationTexturesAssigned;
+
+    [NonSerialized] public NativeArray<float4x2> attchObjAnims_b;
+    [NonSerialized] public Dictionary<string, NativeArray<float4x2>> attchObjAnims_d;
 
     // Start is called before the first frame update
     void OnEnable()
@@ -98,6 +105,21 @@ public class GPUBoneAnimationController : MonoBehaviour
         return true;
     }
 
+    bool ensureAttachObjects()
+    {
+        for(int i = 0; i < bakedClipsAsset.AttachBones.Count; i++)
+        {
+            string boneName = bakedClipsAsset.AttachBones[i];
+            Transform boneTransform = this.transform.Find(boneName);
+            if (boneTransform == null)
+            {
+                Debug.LogError($"Attach point '{boneName}' not found in the hierarchy.");
+                return false;
+            }
+        }
+        return true;
+    }
+
     public void RenderGPUAnimation(int clipIndex)
     {
         if (!Application.IsPlaying(gameObject))
@@ -105,7 +127,8 @@ public class GPUBoneAnimationController : MonoBehaviour
 
         if (!CheckPlayable())
             return;
-
+        GetAttachObjAnimData();
+        
         if (clipIndex < 0 || clipIndex >= bakedClipsAsset.clips.Count)
         {
             Debug.LogWarning($"Animation clip index is out of range: {clipIndex}.", this);
@@ -145,9 +168,7 @@ public class GPUBoneAnimationController : MonoBehaviour
             if (!animationTexturesAssigned)
             {
                 animationTexturesAssigned = ApplyAnimationTextures();
-            }
-
-            if (animationTexturesAssigned)
+            }else
             {
                 int manualFrame = Mathf.RoundToInt(frameplay * (bakedClipsAsset.totalFrames - 1));
                 UpdateShaderFrame(ToTextureFrameCoordinate(manualFrame));
@@ -180,12 +201,7 @@ public class GPUBoneAnimationController : MonoBehaviour
         float frameIndex = ToTextureFrameCoordinate(currentFrame);
         Debug.Log($"Current Frame: {currentFrame}, Frame Index: {frameIndex}");
         UpdateShaderFrame(frameIndex);
-        UpdateAttachObject();
-    }
-
-    void UpdateAttachObject()
-    {
-        //Debug.Log($"worldTransM\n{this.transform.localToWorldMatrix}");
+        UpdateAttachObject(currentFrame);
     }
 
     void UpdateShaderFrame(float frameIndex)
@@ -211,10 +227,45 @@ public class GPUBoneAnimationController : MonoBehaviour
         }
     }
 
+    unsafe void GetAttachObjAnimData()
+    {   var attachObjs = bakedClipsAsset.AttachBones;
+        int framesCount = bakedClipsAsset.totalFrames;
+        attchObjAnims_d = new Dictionary<string, NativeArray<float4x2>>();
+        fixed(byte* ptr = bakedClipsAsset.AttachBoneTRSData)
+        {
+            for(int i = 0; i < attachObjs.Count; i++)
+            {
+                var attachObjAnim = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<float4x2>
+                    ((float4x2*)ptr+(framesCount*i), framesCount,Allocator.None);
+                attchObjAnims_d.Add(attachObjs[i] ,attachObjAnim);
+            }
+        }
+    }
+
+    void UpdateAttachObject(int frameIndex)
+    {
+
+        for(int i = 0; i< this.transform.childCount; i++)
+        {
+            Transform child = this.transform.GetChild(i);
+            var anim = attchObjAnims_d[child.name];
+            float4x2 animframe = anim[frameIndex];
+
+            float3 pos = animframe.c0.xyz;
+            float scale = animframe.c0.w;
+            float4 rota = animframe.c1;
+            child.localPosition  = pos;
+            child.localRotation = new Quaternion(rota.x, rota.y, rota.z, rota.w);
+            child.localScale = new Vector3(scale, scale, scale);
+        }
+    }
+
     private bool ApplyAnimationTextures()
     {
         if (!HasAnimationTextures() || renderers == null || renderers.Length == 0)
             return false;
+
+
 
         if (propertyBlock == null)
         {
