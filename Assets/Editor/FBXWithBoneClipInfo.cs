@@ -501,7 +501,7 @@ public static class FBXWithBoneClipInfo
                         {
                             nonUniformScaleFrames++;
                         }
-                        bonesManager.attachBones.Add(boneInfos[i].BoneName);
+                        
                     }
 
                     frameIndex++;
@@ -521,6 +521,11 @@ public static class FBXWithBoneClipInfo
                     }
                 }
             }
+            if (boneInfos[i].AttachBoneIndex >= 0)
+            {
+                bonesManager.attachBones.Add(boneInfos[i].BoneName);
+            }
+            
             int recordCount = bonesManager.attachBoneTRS.Count - firstRecordIndex;
             if (recordCount > 0)
             {

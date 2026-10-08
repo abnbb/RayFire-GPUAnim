@@ -160,6 +160,7 @@ internal sealed class GPUBoneBakeAssetStore
         try
         {
             ValidateOutputPath(path, typeof(T));
+            generatedAsset.name = Path.GetFileNameWithoutExtension(path);
             T existingAsset = AssetDatabase.LoadAssetAtPath<T>(path);
             if (existingAsset != null)
             {
