@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -501,7 +502,6 @@ public static class FBXWithBoneClipInfo
                         {
                             nonUniformScaleFrames++;
                         }
-                        
                     }
 
                     frameIndex++;
@@ -563,22 +563,13 @@ public static class FBXWithBoneClipInfo
         
         bakedClipsAsset.AttachBones = bonesManager.attachBones;
 
-        // List<uint> attachBoneIndices = new List<uint>();
-        // foreach (var boneInfo in bonesManager.boneInfos)
-        // {
-        //   if(boneInfo.AttachBoneIndex >= 0)
-        //   {
-        //     attachBoneIndices.Add((uint)boneInfo.AttachBoneIndex);
-        //   }
-        // }
-        // bakedClipsAsset.AttachBoneIndices = attachBoneIndices;
-
         var streamHelper = new StreamHelper();
         for(int i= 0;i< bonesManager.attachBoneTRS.Count; i++)
         {
             streamHelper.writeFloat3(bonesManager.attachBoneTRS[i].position);
             streamHelper.writeFloat(bonesManager.attachBoneTRS[i].scale.x);
             streamHelper.writeWriteQuaternion(bonesManager.attachBoneTRS[i].rotation);
+            // Debug.Log($"{AttachBoneLogPrefix} 写入挂点 TRS：T={bonesManager.attachBoneTRS[i].position.ToString("F4")} R={bonesManager.attachBoneTRS[i].rotation.ToString("F4")} S={bonesManager.attachBoneTRS[i].scale.ToString("F4")}，字节偏移：{streamHelper.Length - AttachBoneTRSStride}。");
             
         }
         streamHelper.Capacity = (int)streamHelper.Length;

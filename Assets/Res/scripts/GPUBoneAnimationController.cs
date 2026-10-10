@@ -23,6 +23,11 @@ public class GPUBoneAnimationController : MonoBehaviour
 
     [NonSerialized] public NativeArray<float4x2> attchObjAnims_b;
     [NonSerialized] public Dictionary<string, NativeArray<float4x2>> attchObjAnims_d;
+    private bool loggedAttachReadState;
+    private GCHandle attachDataHandle;
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+    private AtomicSafetyHandle attachDataSafetyHandle;
+#endif
 
     // Start is called before the first frame update
     void OnEnable()
@@ -49,6 +54,12 @@ public class GPUBoneAnimationController : MonoBehaviour
         {
             animationTexturesAssigned = ApplyAnimationTextures();
         }
+    }
+
+    void OnDisable()
+    {
+        isplaying = false;
+        ReleaseAttachObjAnimData();
     }
 
     public bool CheckPlayable()
@@ -228,28 +239,87 @@ public class GPUBoneAnimationController : MonoBehaviour
     }
 
     unsafe void GetAttachObjAnimData()
-    {   var attachObjs = bakedClipsAsset.AttachBones;
+    {
+        ReleaseAttachObjAnimData();
+        var attachObjs = bakedClipsAsset.AttachBones;
         int framesCount = bakedClipsAsset.totalFrames;
+        byte[] data = bakedClipsAsset.AttachBoneTRSData;
+        int dataBytes = data?.Length ?? -1;
+        long expectedBytes = (long)(attachObjs?.Count ?? 0) * framesCount * 32;
+        Debug.Log($"[挂点诊断] 初始化：asset={bakedClipsAsset.name}，挂点=[{(attachObjs == null ? "<null>" : string.Join(", ", attachObjs))}]，帧数={framesCount}，数据字节数={dataBytes}，预期字节数={expectedBytes}。", this);
+        loggedAttachReadState = false;
+        if (attachObjs == null || framesCount <= 0 || data == null || dataBytes != expectedBytes)
+            throw new InvalidOperationException($"[挂点诊断] 挂点数据无效：实际字节数={dataBytes}，预期字节数={expectedBytes}。");
+
         attchObjAnims_d = new Dictionary<string, NativeArray<float4x2>>();
-        fixed(byte* ptr = bakedClipsAsset.AttachBoneTRSData)
+        if (attachObjs.Count == 0)
+            return;
+
+        try
         {
-            for(int i = 0; i < attachObjs.Count; i++)
+            attachDataHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            attachDataSafetyHandle = AtomicSafetyHandle.Create();
+            AtomicSafetyHandle.SetAllowReadOrWriteAccess(attachDataSafetyHandle, true);
+#endif
+            float4x2* ptr = (float4x2*)attachDataHandle.AddrOfPinnedObject().ToPointer();
+            for (int i = 0; i < attachObjs.Count; i++)
             {
                 var attachObjAnim = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<float4x2>
-                    ((float4x2*)ptr+(framesCount*i), framesCount,Allocator.None);
-                attchObjAnims_d.Add(attachObjs[i] ,attachObjAnim);
+                    (ptr + framesCount * i, framesCount, Allocator.None);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref attachObjAnim, attachDataSafetyHandle);
+#endif
+                attchObjAnims_d.Add(attachObjs[i], attachObjAnim);
             }
         }
+        catch
+        {
+            ReleaseAttachObjAnimData();
+            throw;
+        }
+        Debug.Log($"[挂点诊断] 已创建 {attchObjAnims_d.Count} 个 NativeArray 视图。", this);
+    }
+
+    void ReleaseAttachObjAnimData()
+    {
+        attchObjAnims_d?.Clear();
+        attchObjAnims_d = null;
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        if (AtomicSafetyHandle.IsValidNonDefaultHandle(attachDataSafetyHandle))
+        {
+            AtomicSafetyHandle.Release(attachDataSafetyHandle);
+            attachDataSafetyHandle = default;
+        }
+#endif
+        if (attachDataHandle.IsAllocated)
+            attachDataHandle.Free();
     }
 
     void UpdateAttachObject(int frameIndex)
     {
+        if (!loggedAttachReadState)
+        {
+            loggedAttachReadState = true;
+            Debug.Log($"[挂点诊断] 首次读取：frame={frameIndex}，总帧数={bakedClipsAsset?.totalFrames ?? -1}，子节点数={transform.childCount}，字典状态={(attchObjAnims_d == null ? "null" : attchObjAnims_d.Count.ToString())}，数据字节数={bakedClipsAsset?.AttachBoneTRSData?.Length ?? -1}。", this);
+        }
 
         for(int i = 0; i< this.transform.childCount; i++)
         {
             Transform child = this.transform.GetChild(i);
-            var anim = attchObjAnims_d[child.name];
-            float4x2 animframe = anim[frameIndex];
+            NativeArray<float4x2> anim = default;
+            float4x2 animframe;
+            try
+            {
+                anim = attchObjAnims_d[child.name];
+                animframe = anim[frameIndex];
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[挂点诊断] 读取失败：child={child.name}，frame={frameIndex}，总帧数={bakedClipsAsset?.totalFrames ?? -1}，字典为空={attchObjAnims_d == null}，存在键={attchObjAnims_d?.ContainsKey(child.name) ?? false}，视图已创建={anim.IsCreated}，视图长度={anim.Length}，数据字节数={bakedClipsAsset?.AttachBoneTRSData?.Length ?? -1}，异常={exception.GetType().Name}: {exception.Message}", this);
+                isplaying = false;
+                throw;
+            }
 
             float3 pos = animframe.c0.xyz;
             float scale = animframe.c0.w;
@@ -257,6 +327,7 @@ public class GPUBoneAnimationController : MonoBehaviour
             child.localPosition  = pos;
             child.localRotation = new Quaternion(rota.x, rota.y, rota.z, rota.w);
             child.localScale = new Vector3(scale, scale, scale);
+            Debug.Log($"{child.name} 更新挂点 TRS：T={pos} R={rota} S={scale}，帧索引：{frameIndex}。");
         }
     }
 
@@ -264,8 +335,6 @@ public class GPUBoneAnimationController : MonoBehaviour
     {
         if (!HasAnimationTextures() || renderers == null || renderers.Length == 0)
             return false;
-
-
 
         if (propertyBlock == null)
         {
